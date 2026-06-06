@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Reception — 受付管理</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.reception-grid {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media(max-width:900px) { .reception-grid { grid-template-columns: 1fr; } }
+.scanner-card { position: sticky; top: 80px; }
+.checkin-detail { display:none; }
+.checkin-detail--show { display:block; }
+</style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar__brand">
+      <div class="sidebar__logo">Smart Reception</div>
+      <div class="sidebar__subtitle">Receptionist Console</div>
+    </div>
+    <div class="sidebar__user">
+      <div class="sidebar__user-name" id="nav-user-name">—</div>
+      <div class="sidebar__user-role" id="nav-user-role">—</div>
+    </div>
+    <nav class="sidebar__nav">
+      <div class="nav__section">メイン</div>
+      <a class="nav__link" href="index.html"><i class="nav__icon">⊞</i>ダッシュボード</a>
+      <a class="nav__link nav__link--active" href="reception.html"><i class="nav__icon">🎫</i>受付管理</a>
+      <a class="nav__link" href="department.html" data-roles="admin,department"><i class="nav__icon">✅</i>部署承認</a>
+    </nav>
+    <div class="sidebar__footer">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <span style="font-size:12px;color:rgba(255,255,255,.4);">ダークモード</span>
+        <button class="theme-toggle" id="theme-toggle"></button>
+      </div>
+      <button class="btn btn--ghost js-signout" style="width:100%;color:rgba(255,255,255,.5);border-color:rgba(255,255,255,.1);">
+        サインアウト
+      </button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="main-wrap">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+        <h1 class="topbar__title">受付管理</h1>
+      </div>
+      <div class="topbar__actions">
+        <span class="live-dot">LIVE</span>
+        <span class="topbar__time" id="topbar-clock">--:--</span>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <div class="reception-grid">
+        <!-- 左: QRスキャナー -->
+        <div class="scanner-card">
+          <div class="card" style="margin-bottom:24px;">
+            <div class="card__header">
+              <h3 class="card__title">QRコード読取</h3>
+              <button class="btn btn--outline btn--sm" id="btn-toggle-cam">カメラ起動</button>
+            </div>
+            <div class="card__body" style="text-align:center;">
+              <div class="qr-scanner" id="qr-scanner" style="display:none;">
+                <video id="qr-video" playsinline></video>
+                <div class="qr-scanner__overlay">
+                  <div class="qr-scanner__frame"></div>
+                  <div class="qr-scanner__scan-line"></div>
+                </div>
+              </div>
+              <p style="color:var(--color-text-3);font-size:13px;margin:16px 0;">または</p>
+              <div class="search-bar" style="max-width:100%;">
+                <span class="search-bar__icon">🔍</span>
+                <input class="form-control" id="search-visitor" type="text" placeholder="氏名・会社名で検索">
+              </div>
+            </div>
+          </div>
+
+          <!-- 来訪者情報表示 -->
+          <div class="checkin-detail" id="checkin-detail">
+            <div class="visitor-info" id="visitor-info-box">
+              <div class="visitor-info__name" id="vi-name">—</div>
+              <div class="visitor-info__company" id="vi-company">—</div>
+              <div class="visitor-info__grid">
+                <div>
+                  <div class="visitor-info__item-label">訪問部署</div>
+                  <div class="visitor-info__item-value" id="vi-dept">—</div>
+                </div>
+                <div>
+                  <div class="visitor-info__item-label">担当者</div>
+                  <div class="visitor-info__item-value" id="vi-emp">—</div>
+                </div>
+                <div>
+                  <div class="visitor-info__item-label">来訪日時</div>
+                  <div class="visitor-info__item-value" id="vi-date">—</div>
+                </div>
+                <div>
+                  <div class="visitor-info__item-label">目的</div>
+                  <div class="visitor-info__item-value" id="vi-purpose">—</div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px;margin-top:16px;">
+              <button class="btn btn--gold btn--lg" id="btn-issue-badge" style="flex:1;">入館証を発行</button>
+              <button class="btn btn--outline" id="btn-cancel-checkin">キャンセル</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右: タブパネル -->
+        <div>
+          <div class="tabs">
+            <button class="tab tab--active" data-tab="today">本日の予約</button>
+            <button class="tab" data-tab="walkin">当日受付</button>
+            <button class="tab" data-tab="inhouse">在館管理</button>
+            <button class="tab" data-tab="checkout">退館処理</button>
+          </div>
+
+          <!-- 本日予約 -->
+          <div class="tab-panel tab-panel--active" id="tab-today">
+            <div class="card">
+              <div class="card__header">
+                <h3 class="card__title">本日の予約一覧</h3>
+                <span class="live-dot" style="font-size:12px;">リアルタイム</span>
+              </div>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>氏名</th><th>会社</th><th>時刻</th><th>部署</th><th>状態</th><th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="today-list">
+                    <tr><td colspan="6" style="padding:24px;text-align:center;color:var(--color-text-3);">読み込み中...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 当日受付 -->
+          <div class="tab-panel" id="tab-walkin">
+            <div class="card">
+              <div class="card__header">
+                <h3 class="card__title">当日受付（承認待ち）</h3>
+                <span id="walkin-count" class="badge badge--pending">0件</span>
+              </div>
+              <div id="walkin-list">
+                <div class="empty-state">
+                  <div class="empty-state__icon">📋</div>
+                  <p class="empty-state__title">承認待ちはありません</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 在館管理 -->
+          <div class="tab-panel" id="tab-inhouse">
+            <div class="card">
+              <div class="card__header">
+                <h3 class="card__title">現在在館者</h3>
+                <div style="display:flex;gap:8px;">
+                  <button class="btn btn--outline btn--sm" id="btn-emergency">🚨 緊急モード</button>
+                  <button class="btn btn--outline btn--sm" id="btn-export-inhouse">CSV</button>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>氏名</th><th>会社</th><th>入館証</th><th>部署</th><th>入館時刻</th><th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="inhouse-table">
+                    <tr><td colspan="6" style="padding:24px;text-align:center;color:var(--color-text-3);">読み込み中...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 退館処理 -->
+          <div class="tab-panel" id="tab-checkout">
+            <div class="card">
+              <div class="card__header">
+                <h3 class="card__title">退館処理</h3>
+              </div>
+              <div class="card__body">
+                <p style="color:var(--color-text-2);margin-bottom:16px;">入館証番号を入力するか、QRコードを読み取ってください。</p>
+                <div style="display:flex;gap:12px;max-width:400px;">
+                  <input class="form-control" id="checkout-badge" type="text" placeholder="入館証番号（例：A001）">
+                  <button class="btn btn--primary" id="btn-checkout">退館処理</button>
+                </div>
+                <div id="checkout-result" style="margin-top:16px;"></div>
+              </div>
+            </div>
+
+            <!-- 退館履歴 -->
+            <div class="card" style="margin-top:24px;">
+              <div class="card__header">
+                <h3 class="card__title">本日の退館履歴</h3>
+              </div>
+              <div class="table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr><th>氏名</th><th>会社</th><th>入館証</th><th>入館</th><th>退館</th><th>滞在時間</th></tr>
+                  </thead>
+                  <tbody id="checkout-history">
+                    <tr><td colspan="6" style="padding:24px;text-align:center;color:var(--color-text-3);">読み込み中...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- 入館証発行確認モーダル -->
+<div class="modal" id="modal-badge">
+  <div class="modal__box">
+    <div class="modal__header">
+      <h2 class="modal__title">入館証発行</h2>
+      <button class="modal__close" onclick="closeModal('modal-badge')">✕</button>
+    </div>
+    <div class="modal__body" style="text-align:center;">
+      <div class="badge-card" id="badge-display">
+        <div class="badge-card__number" id="badge-number-display">—</div>
+        <div class="badge-card__label">VISITOR BADGE</div>
+      </div>
+      <p style="margin-top:16px;color:var(--color-text-2);" id="badge-visitor-name">—</p>
+      <p style="font-size:12px;color:var(--color-text-3);margin-top:4px;">入館証をお渡しして入館を確認してください</p>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn--outline" onclick="closeModal('modal-badge')">キャンセル</button>
+      <button class="btn btn--gold" id="btn-confirm-badge">入館確定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 緊急モーダル -->
+<div class="modal" id="modal-emergency">
+  <div class="modal__box modal__box--xl">
+    <div class="modal__header" style="background:var(--color-error);color:#fff;border-radius:20px 20px 0 0;">
+      <h2 class="modal__title" style="color:#fff;">🚨 緊急時在館者一覧</h2>
+      <button class="modal__close" style="color:#fff;" onclick="closeModal('modal-emergency')">✕</button>
+    </div>
+    <div class="modal__body">
+      <div class="emergency-banner">
+        <span style="font-size:24px;">⚠</span>
+        <div>
+          <strong>緊急時モード</strong>
+          <p style="font-size:13px;opacity:.9;margin-top:2px;">現在館内にいる全員のリストです。避難誘導にご活用ください。</p>
+        </div>
+        <button class="btn btn--outline btn--sm" id="btn-emergency-csv" style="margin-left:auto;border-color:rgba(255,255,255,.4);color:#fff;">CSV出力</button>
+      </div>
+      <div class="table-wrap">
+        <table class="table" id="emergency-table">
+          <thead>
+            <tr><th>氏名</th><th>会社</th><th>入館証</th><th>入館時刻</th><th>部署</th><th>担当者</th></tr>
+          </thead>
+          <tbody id="emergency-list"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script src="js/reception.js"></script>
+</body>
+</html>

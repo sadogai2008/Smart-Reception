@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Reception — ログイン</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo__text">Smart Reception</div>
+      <div class="login-logo__sub">Enterprise Visitor Management</div>
+    </div>
+
+    <form id="login-form" novalidate>
+      <div class="form-group">
+        <label class="form-label form-label--required" for="email">メールアドレス</label>
+        <input class="form-control" type="email" id="email" placeholder="user@example.com" autocomplete="email" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label form-label--required" for="password">パスワード</label>
+        <input class="form-control" type="password" id="password" placeholder="••••••••" autocomplete="current-password" required>
+      </div>
+      <div id="login-error" style="display:none;color:#ff6b6b;font-size:13px;margin-bottom:16px;"></div>
+      <button class="btn btn--gold btn--lg" type="submit" id="login-btn" style="width:100%;margin-top:8px;">
+        ログイン
+      </button>
+    </form>
+
+    <p style="text-align:center;margin-top:24px;font-size:12px;color:rgba(255,255,255,.3);">
+      アカウントのご案内はシステム管理者にお問い合わせください
+    </p>
+  </div>
+</div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script>
+(function() {
+  // ダークモード復元
+  if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+
+  // ログイン済みならダッシュボードへ
+  auth.onAuthStateChanged(user => {
+    if (user) window.location.href = 'index.html';
+  });
+
+  document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const btn      = document.getElementById('login-btn');
+    const errEl    = document.getElementById('login-error');
+    errEl.style.display = 'none';
+
+    if (!email || !password) {
+      errEl.textContent = 'メールアドレスとパスワードを入力してください。';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    btn.textContent = 'ログイン中...';
+    btn.disabled = true;
+
+    try {
+      await auth.signInWithEmailAndPassword(email, password);
+      // onAuthStateChanged が発火してリダイレクト
+    } catch (err) {
+      const msgs = {
+        'auth/user-not-found':   'メールアドレスが見つかりません。',
+        'auth/wrong-password':   'パスワードが正しくありません。',
+        'auth/invalid-credential': 'メールアドレスまたはパスワードが正しくありません。',
+        'auth/too-many-requests':'ログイン試行回数が多すぎます。しばらくお待ちください。',
+        'auth/user-disabled':    'このアカウントは無効化されています。'
+      };
+      errEl.textContent = msgs[err.code] || 'ログインに失敗しました。';
+      errEl.style.display = 'block';
+      btn.textContent = 'ログイン';
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>

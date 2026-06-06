@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Reception — ダッシュボード</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <!-- サイドバー -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar__brand">
+      <div class="sidebar__logo">Smart Reception</div>
+      <div class="sidebar__subtitle">Enterprise Visitor Management</div>
+    </div>
+    <div class="sidebar__user">
+      <div class="sidebar__user-name" id="nav-user-name">—</div>
+      <div class="sidebar__user-role" id="nav-user-role">—</div>
+    </div>
+    <nav class="sidebar__nav">
+      <div class="nav__section">メイン</div>
+      <a class="nav__link" href="index.html"><i class="nav__icon">⊞</i>ダッシュボード</a>
+      <a class="nav__link" href="reception.html" data-roles="admin,receptionist"><i class="nav__icon">🎫</i>受付管理</a>
+      <a class="nav__link" href="department.html" data-roles="admin,department"><i class="nav__icon">✅</i>部署承認</a>
+
+      <div class="nav__section">来訪者管理</div>
+      <a class="nav__link" href="#" id="nav-new-reservation"><i class="nav__icon">＋</i>来訪予約登録</a>
+      <a class="nav__link" href="#" id="nav-reservations"><i class="nav__icon">📋</i>予約一覧</a>
+      <a class="nav__link" href="#" id="nav-checkins"><i class="nav__icon">🏢</i>在館管理</a>
+
+      <div class="nav__section">管理</div>
+      <a class="nav__link" href="admin.html" data-roles="admin"><i class="nav__icon">⚙</i>システム管理</a>
+    </nav>
+    <div class="sidebar__footer">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <span style="font-size:12px;color:rgba(255,255,255,.4);">ダークモード</span>
+        <button class="theme-toggle" id="theme-toggle" title="テーマ切替"></button>
+      </div>
+      <button class="btn btn--ghost js-signout" style="width:100%;color:rgba(255,255,255,.5);border-color:rgba(255,255,255,.1);">
+        サインアウト
+      </button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- メインコンテンツ -->
+  <div class="main-wrap">
+    <!-- トップバー -->
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="hamburger" id="hamburger" aria-label="メニュー">
+          <span></span><span></span><span></span>
+        </button>
+        <h1 class="topbar__title">ダッシュボード</h1>
+      </div>
+      <div class="topbar__actions">
+        <span class="live-dot">LIVE</span>
+        <div class="notif-wrap">
+          <button class="btn btn--ghost btn--icon" id="notif-btn" title="通知">🔔</button>
+          <span id="notif-badge">0</span>
+        </div>
+        <div class="topbar__time" id="topbar-clock">--:--</div>
+      </div>
+    </header>
+
+    <!-- ページ本体 -->
+    <main class="page-content">
+      <div class="page-header">
+        <h2 class="page-header__title">本日の状況</h2>
+        <p class="page-header__sub" id="today-date">—</p>
+      </div>
+
+      <!-- 統計カード -->
+      <div class="stat-grid" id="stat-grid">
+        <div class="stat-card">
+          <div class="stat-card__accent"></div>
+          <div class="stat-card__label">本日の来訪予定</div>
+          <div class="stat-card__value" id="stat-scheduled">—</div>
+          <div class="stat-card__sub">件</div>
+        </div>
+        <div class="stat-card stat-card--success">
+          <div class="stat-card__accent"></div>
+          <div class="stat-card__label">本日の来訪済み</div>
+          <div class="stat-card__value" id="stat-visited">—</div>
+          <div class="stat-card__sub">件</div>
+        </div>
+        <div class="stat-card stat-card--navy">
+          <div class="stat-card__accent"></div>
+          <div class="stat-card__label">現在在館中</div>
+          <div class="stat-card__value" id="stat-inhouse">—</div>
+          <div class="stat-card__sub">名</div>
+        </div>
+        <div class="stat-card stat-card--warning">
+          <div class="stat-card__accent"></div>
+          <div class="stat-card__label">承認待ち</div>
+          <div class="stat-card__value" id="stat-pending">—</div>
+          <div class="stat-card__sub">件</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__accent"></div>
+          <div class="stat-card__label">今月の来訪者</div>
+          <div class="stat-card__value" id="stat-monthly">—</div>
+          <div class="stat-card__sub">件</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- 本日の予約一覧 -->
+        <div class="card">
+          <div class="card__header">
+            <h3 class="card__title">本日の予約</h3>
+            <button class="btn btn--gold btn--sm" id="btn-new-reservation">＋ 新規予約</button>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>来訪者</th>
+                  <th>会社</th>
+                  <th>時刻</th>
+                  <th>部署</th>
+                  <th>状態</th>
+                </tr>
+              </thead>
+              <tbody id="today-reservation-list">
+                <tr><td colspan="5" class="empty-state" style="padding:24px;text-align:center;color:var(--color-text-3);">読み込み中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 現在在館者 -->
+        <div class="card">
+          <div class="card__header">
+            <h3 class="card__title">現在在館者</h3>
+            <span class="live-dot" style="font-size:12px;">リアルタイム</span>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>氏名</th>
+                  <th>入館証</th>
+                  <th>入館時刻</th>
+                  <th>部署</th>
+                </tr>
+              </thead>
+              <tbody id="inhouse-list">
+                <tr><td colspan="4" style="padding:24px;text-align:center;color:var(--color-text-3);">読み込み中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 月間グラフ (簡易) -->
+      <div class="card mt-4" style="margin-top:24px;">
+        <div class="card__header">
+          <h3 class="card__title">今月の来訪推移</h3>
+          <button class="btn btn--outline btn--sm" id="btn-export-monthly">CSV出力</button>
+        </div>
+        <div class="card__body">
+          <div id="monthly-chart" style="height:160px;display:flex;align-items:flex-end;gap:4px;padding:0 8px;"></div>
+          <div id="monthly-chart-labels" style="display:flex;gap:4px;margin-top:8px;padding:0 8px;justify-content:space-between;"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- 予約登録モーダル -->
+<div class="modal" id="modal-reservation">
+  <div class="modal__box modal__box--lg">
+    <div class="modal__header">
+      <h2 class="modal__title">来訪予約登録</h2>
+      <button class="modal__close" onclick="closeModal('modal-reservation')">✕</button>
+    </div>
+    <div class="modal__body">
+      <form id="reservation-form" novalidate>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label form-label--required">来訪者氏名</label>
+            <input class="form-control" id="r-visitor-name" type="text" placeholder="山田 太郎" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label form-label--required">会社名</label>
+            <input class="form-control" id="r-company" type="text" placeholder="株式会社サンプル" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label form-label--required">メールアドレス</label>
+            <input class="form-control" id="r-email" type="email" placeholder="visitor@example.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">電話番号</label>
+            <input class="form-control" id="r-phone" type="tel" placeholder="03-0000-0000">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label form-label--required">訪問部署</label>
+            <select class="form-control" id="r-department" required>
+              <option value="">部署を選択</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label form-label--required">担当社員</label>
+            <select class="form-control" id="r-employee" required>
+              <option value="">担当者を選択</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label form-label--required">来訪日時</label>
+            <input class="form-control" id="r-date" type="datetime-local" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label form-label--required">来訪人数</label>
+            <input class="form-control" id="r-count" type="number" min="1" value="1" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label form-label--required">来訪目的</label>
+          <input class="form-control" id="r-purpose" type="text" placeholder="商談、打ち合わせ など" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">備考</label>
+          <textarea class="form-control" id="r-notes" placeholder="特記事項があればご記入ください"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn--outline" onclick="closeModal('modal-reservation')">キャンセル</button>
+      <button class="btn btn--gold" id="btn-submit-reservation">予約を登録してQR送信</button>
+    </div>
+  </div>
+</div>
+
+<!-- QRコード確認モーダル -->
+<div class="modal" id="modal-qr">
+  <div class="modal__box">
+    <div class="modal__header">
+      <h2 class="modal__title">QRコード発行済み</h2>
+      <button class="modal__close" onclick="closeModal('modal-qr')">✕</button>
+    </div>
+    <div class="modal__body" style="text-align:center;">
+      <p style="margin-bottom:16px;color:var(--color-text-2);">招待メールをお送りしました。QRコードは以下の通りです。</p>
+      <div id="qr-preview" style="display:inline-block;padding:16px;background:#fff;border-radius:12px;"></div>
+      <p style="margin-top:16px;font-size:12px;color:var(--color-text-3);" id="qr-visitor-name-label"></p>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn--primary" onclick="closeModal('modal-qr')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script src="js/dashboard.js"></script>
+</body>
+</html>
