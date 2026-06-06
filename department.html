@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Reception — 部署承認</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar__brand">
+      <div class="sidebar__logo">Smart Reception</div>
+      <div class="sidebar__subtitle">Receptionist Console</div>
+    </div>
+    <div class="sidebar__user">
+      <div class="sidebar__user-name" id="nav-user-name">—</div>
+      <div class="sidebar__user-role" id="nav-user-role">—</div>
+    </div>
+    <nav class="sidebar__nav">
+      <div class="nav__section">メイン</div>
+      <a class="nav__link" href="index.html"><i class="nav__icon">⊞</i>ダッシュボード</a>
+      <a class="nav__link" href="reception.html" data-roles="admin,receptionist"><i class="nav__icon">🎫</i>受付管理</a>
+      <a class="nav__link nav__link--active" href="department.html"><i class="nav__icon">✅</i>部署承認</a>
+      <div class="nav__section" data-roles="admin">管理</div>
+      <a class="nav__link" href="admin.html" data-roles="admin"><i class="nav__icon">⚙</i>システム管理</a>
+    </nav>
+    <div class="sidebar__footer">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <span style="font-size:12px;color:rgba(255,255,255,.4);">ダークモード</span>
+        <button class="theme-toggle" id="theme-toggle"></button>
+      </div>
+      <button class="btn btn--ghost js-signout" style="width:100%;color:rgba(255,255,255,.5);border-color:rgba(255,255,255,.1);">
+        サインアウト
+      </button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="main-wrap">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+        <h1 class="topbar__title">部署承認</h1>
+      </div>
+      <div class="topbar__actions">
+        <span class="live-dot">LIVE</span>
+        <span class="topbar__time" id="topbar-clock">--:--</span>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- 承認待ち -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;" class="dept-stats">
+        <div class="stat-card stat-card--warning">
+          <div class="stat-card__accent"></div>
+          <div class="stat-card__label">承認待ち</div>
+          <div class="stat-card__value" id="stat-pending-dept">—</div>
+          <div class="stat-card__sub">件</div>
+        </div>
+        <div class="stat-card stat-card--success">
+          <div class="stat-card__accent"></div>
+          <div class="stat-card__label">本日承認済み</div>
+          <div class="stat-card__value" id="stat-approved-dept">—</div>
+          <div class="stat-card__sub">件</div>
+        </div>
+      </div>
+
+      <!-- タブ -->
+      <div class="tabs">
+        <button class="tab tab--active" data-tab="dept-pending">承認待ち <span id="badge-pending-tab" class="badge badge--pending" style="margin-left:6px;">0</span></button>
+        <button class="tab" data-tab="dept-today-res">本日の自部署予約</button>
+        <button class="tab" data-tab="dept-history">承認履歴</button>
+      </div>
+
+      <!-- 承認待ち一覧 -->
+      <div class="tab-panel tab-panel--active" id="tab-dept-pending">
+        <div id="dept-walkin-list">
+          <div class="empty-state">
+            <div class="empty-state__icon">✅</div>
+            <p class="empty-state__title">承認待ちはありません</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 本日の自部署予約 -->
+      <div class="tab-panel" id="tab-dept-today-res">
+        <div class="card">
+          <div class="card__header">
+            <h3 class="card__title">本日の自部署来訪予約</h3>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>氏名</th><th>会社</th><th>時刻</th><th>担当者</th><th>状態</th></tr>
+              </thead>
+              <tbody id="dept-res-list">
+                <tr><td colspan="5" style="padding:24px;text-align:center;color:var(--color-text-3);">読み込み中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 承認履歴 -->
+      <div class="tab-panel" id="tab-dept-history">
+        <div class="card">
+          <div class="card__header">
+            <h3 class="card__title">承認・拒否履歴（本日）</h3>
+            <button class="btn btn--outline btn--sm" id="btn-export-dept-history">CSV</button>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>氏名</th><th>会社</th><th>用件</th><th>申請時刻</th><th>結果</th><th>処理時刻</th></tr>
+              </thead>
+              <tbody id="dept-history-list">
+                <tr><td colspan="6" style="padding:24px;text-align:center;color:var(--color-text-3);">読み込み中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- 拒否理由モーダル -->
+<div class="modal" id="modal-reject">
+  <div class="modal__box">
+    <div class="modal__header">
+      <h2 class="modal__title">来訪を拒否</h2>
+      <button class="modal__close" onclick="closeModal('modal-reject')">✕</button>
+    </div>
+    <div class="modal__body">
+      <p style="color:var(--color-text-2);margin-bottom:16px;">拒否理由をご入力ください（任意）</p>
+      <textarea class="form-control" id="reject-reason" placeholder="例：本日は担当者が不在のため" rows="4"></textarea>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn--outline" onclick="closeModal('modal-reject')">キャンセル</button>
+      <button class="btn btn--danger" id="btn-confirm-reject">拒否する</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+'use strict';
+
+// 管理者・部署担当者のみアクセス可
+initAuth([ROLES.ADMIN, ROLES.DEPARTMENT], onReady);
+
+let rejectTargetId  = null;
+let historyData     = [];
+
+function onReady(user, profile) {
+  initNav();
+  startClock();
+  initMobileNav();
+  initThemeToggle();
+  initTabs();
+  listenPendingWalkIns();
+  listenDeptReservations();
+  listenDeptHistory();
+  loadDeptStats();
+}
+
+function initTabs() {
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(b => b.classList.remove('tab--active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('tab-panel--active'));
+      btn.classList.add('tab--active');
+      const panel = document.getElementById('tab-' + btn.dataset.tab);
+      if (panel) panel.classList.add('tab-panel--active');
+    });
+  });
+}
+
+async function loadDeptStats() {
+  try {
+    const deptId = currentProfile.departmentId;
+    // 承認待ち
+    let qPending = db.collection('walkIns').where('status', '==', 'pending');
+    if (deptId && !currentProfile.role === ROLES.ADMIN) qPending = qPending.where('departmentId', '==', deptId);
+    const pendingSnap = await qPending.get();
+    document.getElementById('stat-pending-dept').textContent = pendingSnap.size;
+
+    // 本日承認済み
+    let qApproved = db.collection('walkIns')
+      .where('status', 'in', ['approved', 'checked_in'])
+      .where('respondedAt', '>=', todayStart());
+    if (deptId && currentProfile.role !== ROLES.ADMIN) qApproved = qApproved.where('departmentId', '==', deptId);
+    const approvedSnap = await qApproved.get();
+    document.getElementById('stat-approved-dept').textContent = approvedSnap.size;
+  } catch(e) { console.warn('Stats error:', e); }
+}
+
+function listenPendingWalkIns() {
+  const listEl  = document.getElementById('dept-walkin-list');
+  const badgeEl = document.getElementById('badge-pending-tab');
+  const deptId  = currentProfile.departmentId;
+
+  let q = db.collection('walkIns').where('status', '==', 'pending').orderBy('submittedAt');
+  if (deptId && currentProfile.role !== ROLES.ADMIN) {
+    q = q.where('departmentId', '==', deptId);
+  }
+
+  const unsub = q.onSnapshot(snap => {
+    if (badgeEl) badgeEl.textContent = snap.size;
+    document.getElementById('stat-pending-dept').textContent = snap.size;
+
+    if (snap.empty) {
+      listEl.innerHTML = `<div class="empty-state">
+        <div class="empty-state__icon">✅</div>
+        <p class="empty-state__title">承認待ちはありません</p>
+        <p style="color:var(--color-text-3);font-size:13px;">当日受付の申請がここに表示されます</p>
+      </div>`;
+      return;
+    }
+
+    listEl.innerHTML = snap.docs.map(d => {
+      const w = d.data();
+      const elapsed = w.submittedAt
+        ? Math.round((Date.now() - (w.submittedAt.toDate ? w.submittedAt.toDate() : new Date(w.submittedAt)).getTime()) / 60000)
+        : 0;
+      const urgentClass = elapsed > 10 ? 'style="border-color:var(--color-warning);"' : '';
+      return `<div class="approval-card fade-in" ${urgentClass}>
+        <div class="approval-card__header">
+          <div>
+            <div class="approval-card__name">${sanitize(w.name)}</div>
+            <div style="color:var(--color-text-3);font-size:13px;">${sanitize(w.company)}</div>
+          </div>
+          <div style="text-align:right;">
+            <span class="badge badge--pending">承認待ち</span>
+            <div style="font-size:11px;color:${elapsed > 10 ? 'var(--color-warning)' : 'var(--color-text-3)'};margin-top:4px;">${elapsed}分前</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;margin-bottom:8px;">
+          <div><span style="color:var(--color-text-3);">訪問部署: </span><strong>${sanitize(w.departmentName || '-')}</strong></div>
+          <div><span style="color:var(--color-text-3);">訪問相手: </span><strong>${sanitize(w.hostName || '-')}</strong></div>
+          <div><span style="color:var(--color-text-3);">用件: </span>${sanitize(w.purpose || '-')}</div>
+          <div><span style="color:var(--color-text-3);">受付番号: </span><span style="font-family:monospace;font-weight:600;">${sanitize(w.receiptNumber || '-')}</span></div>
+        </div>
+        ${w.phone ? `<div style="font-size:13px;color:var(--color-text-3);">電話: ${sanitize(w.phone)}</div>` : ''}
+        <div class="approval-card__actions">
+          <button class="btn btn--success" onclick="approveWalkIn('${d.id}')">✓ 承認する</button>
+          <button class="btn btn--danger btn--outline" onclick="openRejectModal('${d.id}')">✕ 拒否する</button>
+        </div>
+      </div>`;
+    }).join('');
+  });
+  unsubscribers.push(unsub);
+}
+
+async function approveWalkIn(walkInId) {
+  if (!confirm('この来訪を承認しますか？受付へ通知されます。')) return;
+  showLoading('承認処理中...');
+  try {
+    const now = firebase.firestore.FieldValue.serverTimestamp();
+    await db.collection('walkIns').doc(walkInId).update({
+      status:      'approved',
+      respondedAt: now,
+      respondedBy: currentUser.uid,
+      respondedByName: currentProfile.displayName || ''
+    });
+
+    const snap = await db.collection('walkIns').doc(walkInId).get();
+    const w = snap.data();
+
+    await createNotification('walkin_approved', '来訪承認', `${w.name}様（${w.company}）の来訪が承認されました`, walkInId, ROLES.RECEPTIONIST);
+    await writeLog('walkin_approved', 'walkin', walkInId, 'walkin', { visitorName: w.name });
+
+    // 申請者へメール（メアドあれば）
+    if (w.email) {
+      try { await sendApprovalEmail(w, true); } catch(e) { console.warn('Mail error:', e); }
+    }
+
+    showToast(`${w.name}様の来訪を承認しました。受付へ通知しました。`, 'success');
+    loadDeptStats();
+  } catch(err) {
+    showToast('承認エラー: ' + err.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function openRejectModal(walkInId) {
+  rejectTargetId = walkInId;
+  document.getElementById('reject-reason').value = '';
+  openModal('modal-reject');
+
+  document.getElementById('btn-confirm-reject').onclick = () => rejectWalkIn(walkInId);
+}
+
+async function rejectWalkIn(walkInId) {
+  const reason = document.getElementById('reject-reason').value.trim();
+  closeModal('modal-reject');
+  showLoading('拒否処理中...');
+  try {
+    const snap = await db.collection('walkIns').doc(walkInId).get();
+    const w    = snap.data();
+    const now  = firebase.firestore.FieldValue.serverTimestamp();
+
+    await db.collection('walkIns').doc(walkInId).update({
+      status:          'rejected',
+      rejectionReason: reason,
+      respondedAt:     now,
+      respondedBy:     currentUser.uid,
+      respondedByName: currentProfile.displayName || ''
+    });
+
+    await writeLog('walkin_rejected', 'walkin', walkInId, 'walkin', { visitorName: w.name, reason });
+    await createNotification('walkin_rejected', '来訪拒否', `${w.name}様の来訪が拒否されました`, walkInId, ROLES.RECEPTIONIST);
+
+    if (w.email) {
+      try { await sendApprovalEmail(w, false, reason); } catch(e) { console.warn('Mail error:', e); }
+    }
+
+    showToast(`${w.name}様の来訪を拒否しました。`, 'info');
+    loadDeptStats();
+  } catch(err) {
+    showToast('拒否処理エラー: ' + err.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function listenDeptReservations() {
+  const tbody  = document.getElementById('dept-res-list');
+  const deptId = currentProfile.departmentId;
+  let q = db.collection('reservations')
+    .where('visitDate', '>=', todayStart())
+    .where('visitDate', '<=', todayEnd())
+    .orderBy('visitDate');
+  if (deptId && currentProfile.role !== ROLES.ADMIN) {
+    q = q.where('departmentId', '==', deptId);
+  }
+  const unsub = q.onSnapshot(snap => {
+    if (snap.empty) {
+      tbody.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--color-text-3);">本日の予約はありません</td></tr>';
+      return;
+    }
+    const statusLabels = {
+      pending:'予約済', confirmed:'確認済', checked_in:'入館中',
+      checked_out:'退館済', cancelled:'キャンセル', rejected:'拒否'
+    };
+    tbody.innerHTML = snap.docs.map(d => {
+      const r = d.data();
+      return `<tr class="fade-in">
+        <td><strong>${sanitize(r.visitorName)}</strong><br><small style="color:var(--color-text-3)">${sanitize(r.visitorCompany)}</small></td>
+        <td>${sanitize(r.visitorCompany)}</td>
+        <td>${formatTime(r.visitDate)}</td>
+        <td>${sanitize(r.employeeName || '-')}</td>
+        <td><span class="badge badge--${r.status}">${statusLabels[r.status] || r.status}</span></td>
+      </tr>`;
+    }).join('');
+  });
+  unsubscribers.push(unsub);
+}
+
+function listenDeptHistory() {
+  const tbody  = document.getElementById('dept-history-list');
+  const deptId = currentProfile.departmentId;
+  let q = db.collection('walkIns')
+    .where('status', 'in', ['approved', 'rejected', 'checked_in'])
+    .where('submittedAt', '>=', todayStart())
+    .orderBy('submittedAt', 'desc');
+  if (deptId && currentProfile.role !== ROLES.ADMIN) {
+    q = q.where('departmentId', '==', deptId);
+  }
+  const unsub = q.onSnapshot(snap => {
+    historyData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (snap.empty) {
+      tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--color-text-3);">履歴はありません</td></tr>';
+      return;
+    }
+    tbody.innerHTML = historyData.map(w => {
+      const statusLabels = { approved:'承認', rejected:'拒否', checked_in:'入館済' };
+      const statusClass  = { approved:'checked_in', rejected:'rejected', checked_in:'checked_in' };
+      return `<tr class="fade-in">
+        <td><strong>${sanitize(w.name)}</strong></td>
+        <td>${sanitize(w.company)}</td>
+        <td>${sanitize(w.purpose || '-')}</td>
+        <td>${formatTime(w.submittedAt)}</td>
+        <td><span class="badge badge--${statusClass[w.status] || 'pending'}">${statusLabels[w.status] || w.status}</span></td>
+        <td>${formatTime(w.respondedAt)}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('stat-approved-dept').textContent = historyData.filter(w => w.status !== 'rejected').length;
+  });
+  unsubscribers.push(unsub);
+}
+
+document.getElementById('btn-export-dept-history').addEventListener('click', () => {
+  const rows = historyData.map(w => ({
+    '氏名':     w.name,
+    '会社':     w.company,
+    '用件':     w.purpose || '-',
+    '申請時刻': formatDateTime(w.submittedAt),
+    '結果':     w.status === 'approved' ? '承認' : w.status === 'rejected' ? '拒否' : '入館済',
+    '処理時刻': formatDateTime(w.respondedAt),
+    '処理者':   w.respondedByName || '-',
+    '拒否理由': w.rejectionReason || ''
+  }));
+  exportCSV(rows, `部署承認履歴_${new Date().toLocaleDateString('ja-JP').replace(/\//g,'-')}.csv`);
+});
+</script>
+</body>
+</html>
