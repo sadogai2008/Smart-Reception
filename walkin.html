@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Smart Reception — ご来訪の受付</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+/* ============================================================
+   iPad 来訪者自己申請画面 専用スタイル
+   ============================================================ */
+body { overflow: hidden; }
+
+.walkin-bg {
+  min-height: 100vh;
+  background: linear-gradient(160deg, #060c1a 0%, #0d1b3e 50%, #162448 100%);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.walkin-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 15% 15%, rgba(184,151,58,.12) 0%, transparent 45%),
+    radial-gradient(circle at 85% 85%, rgba(36,61,122,.5) 0%, transparent 45%);
+  pointer-events: none;
+}
+
+/* 受付不要粒子装飾 */
+.walkin-bg::after {
+  content: '';
+  position: absolute;
+  width: 600px; height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(184,151,58,.04) 0%, transparent 70%);
+  top: -200px; right: -200px;
+  pointer-events: none;
+}
+
+.walkin-header {
+  padding: 32px 48px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 2;
+}
+
+.walkin-logo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.walkin-logo__icon {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #b8973a, #d4af50);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 4px 16px rgba(184,151,58,.4);
+}
+
+.walkin-logo__text {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--color-gold-2);
+  letter-spacing: .05em;
+}
+
+.walkin-clock {
+  font-family: 'DM Mono', monospace;
+  font-size: 32px;
+  color: rgba(255,255,255,.7);
+  letter-spacing: .08em;
+  text-align: right;
+}
+
+.walkin-clock__date {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: rgba(255,255,255,.4);
+  letter-spacing: .05em;
+  margin-top: 2px;
+}
+
+.walkin-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 48px 48px;
+  position: relative;
+  z-index: 2;
+}
+
+/* ステップ画面 */
+.walkin-step { display: none; width: 100%; max-width: 720px; }
+.walkin-step--active { display: block; animation: stepIn .4s cubic-bezier(.34,1.56,.64,1); }
+
+@keyframes stepIn {
+  from { opacity: 0; transform: translateY(24px) scale(.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.walkin-card {
+  background: rgba(255,255,255,.06);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 28px;
+  padding: 48px;
+  box-shadow: 0 24px 64px rgba(0,0,0,.4);
+}
+
+.walkin-card__title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 36px;
+  font-weight: 500;
+  color: #fff;
+  letter-spacing: .03em;
+  margin-bottom: 8px;
+}
+
+.walkin-card__sub {
+  font-size: 15px;
+  color: rgba(255,255,255,.5);
+  margin-bottom: 36px;
+}
+
+/* フォームフィールド（iPad最適化） */
+.walkin-form .form-label {
+  color: rgba(255,255,255,.5);
+  font-size: 11px;
+}
+
+.walkin-form .form-control {
+  background: rgba(255,255,255,.07);
+  border-color: rgba(255,255,255,.15);
+  color: #fff;
+  font-size: 18px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  height: 56px;
+}
+
+.walkin-form select.form-control {
+  background-color: #0d1b3e;
+  color: #fff;
+}
+
+.walkin-form .form-control:focus {
+  border-color: var(--color-gold-2);
+  box-shadow: 0 0 0 3px rgba(212,175,80,.2);
+}
+
+.walkin-form .form-control::placeholder { color: rgba(255,255,255,.25); }
+
+/* ステップインジケーター */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.step-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.2);
+  transition: all .3s;
+}
+
+.step-dot--active {
+  width: 24px;
+  border-radius: 4px;
+  background: var(--color-gold-2);
+}
+
+.step-dot--done {
+  background: var(--color-success);
+}
+
+/* ボタン */
+.walkin-btn {
+  width: 100%;
+  padding: 18px 32px;
+  font-size: 17px;
+  font-weight: 600;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  transition: all .2s;
+  letter-spacing: .03em;
+  margin-top: 28px;
+}
+
+.walkin-btn--gold {
+  background: linear-gradient(135deg, #b8973a, #d4af50);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(184,151,58,.4);
+}
+
+.walkin-btn--gold:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(184,151,58,.5); }
+.walkin-btn--gold:active { transform: translateY(0); }
+
+.walkin-btn--outline {
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.7);
+  border: 1px solid rgba(255,255,255,.15);
+}
+
+.walkin-btn--outline:hover { background: rgba(255,255,255,.1); }
+
+.btn-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.btn-row .walkin-btn { margin-top: 0; }
+
+/* 完了画面 */
+.success-icon {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(26,122,74,.3), rgba(26,122,74,.1));
+  border: 2px solid var(--color-success);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px;
+  margin: 0 auto 24px;
+  animation: successPop .5s cubic-bezier(.34,1.56,.64,1);
+}
+
+@keyframes successPop {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.success-number {
+  font-family: 'DM Mono', monospace;
+  font-size: 56px;
+  font-weight: 700;
+  color: var(--color-gold-2);
+  text-align: center;
+  letter-spacing: .1em;
+  text-shadow: 0 0 40px rgba(212,175,80,.4);
+  margin: 8px 0;
+}
+
+.success-label {
+  text-align: center;
+  color: rgba(255,255,255,.5);
+  font-size: 13px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+/* フォームグリッド */
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 640px) {
+  .form-grid-2 { grid-template-columns: 1fr; }
+  .walkin-card { padding: 28px 24px; border-radius: 20px; }
+  .walkin-header { padding: 20px 24px 0; }
+  .walkin-main { padding: 16px 24px 32px; }
+  .walkin-card__title { font-size: 28px; }
+  .walkin-logo__text { font-size: 22px; }
+  .walkin-clock { font-size: 24px; }
+}
+
+.error-msg {
+  color: #ff8a8a;
+  font-size: 13px;
+  margin-top: 4px;
+  min-height: 18px;
+}
+</style>
+</head>
+<body>
+<div class="walkin-bg">
+  <!-- ヘッダー -->
+  <header class="walkin-header">
+    <div class="walkin-logo">
+      <div class="walkin-logo__icon">🏢</div>
+      <div class="walkin-logo__text">Smart Reception</div>
+    </div>
+    <div>
+      <div class="walkin-clock" id="walkin-clock">--:--</div>
+      <div class="walkin-clock__date" id="walkin-date">—</div>
+    </div>
+  </header>
+
+  <main class="walkin-main">
+
+    <!-- STEP 1: 基本情報 -->
+    <div class="walkin-step walkin-step--active" id="step-1">
+      <div class="walkin-card">
+        <div class="step-indicator">
+          <div class="step-dot step-dot--active" id="dot-1"></div>
+          <div class="step-dot" id="dot-2"></div>
+          <div class="step-dot" id="dot-3"></div>
+        </div>
+        <div class="walkin-card__title">ようこそ</div>
+        <div class="walkin-card__sub">お名前・会社名をご入力ください</div>
+        <div class="walkin-form">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label form-label--required">お名前</label>
+              <input class="form-control" id="wi-name" type="text" placeholder="山田 太郎" autocomplete="off">
+              <div class="error-msg" id="err-wi-name"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label form-label--required">会社名</label>
+              <input class="form-control" id="wi-company" type="text" placeholder="株式会社○○" autocomplete="off">
+              <div class="error-msg" id="err-wi-company"></div>
+            </div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">電話番号</label>
+              <input class="form-control" id="wi-phone" type="tel" placeholder="090-0000-0000" autocomplete="off">
+              <div class="error-msg" id="err-wi-phone"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">メールアドレス</label>
+              <input class="form-control" id="wi-email" type="email" placeholder="you@example.com" autocomplete="off">
+              <div class="error-msg" id="err-wi-email"></div>
+            </div>
+          </div>
+          <button class="walkin-btn walkin-btn--gold" id="btn-step1-next">次へ →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: 訪問先情報 -->
+    <div class="walkin-step" id="step-2">
+      <div class="walkin-card">
+        <div class="step-indicator">
+          <div class="step-dot step-dot--done" id="dot-1b"></div>
+          <div class="step-dot step-dot--active" id="dot-2b"></div>
+          <div class="step-dot" id="dot-3b"></div>
+        </div>
+        <div class="walkin-card__title">訪問先の確認</div>
+        <div class="walkin-card__sub">ご訪問の詳細をご入力ください</div>
+        <div class="walkin-form">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label form-label--required">訪問部署</label>
+              <select class="form-control" id="wi-department">
+                <option value="">部署を選択</option>
+              </select>
+              <div class="error-msg" id="err-wi-dept"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label form-label--required">ご訪問相手</label>
+              <select class="form-control" id="wi-host">
+                <option value="">担当者を選択</option>
+              </select>
+              <div class="error-msg" id="err-wi-host"></div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label form-label--required">ご用件</label>
+            <input class="form-control" id="wi-purpose" type="text" placeholder="商談・打ち合わせ・納品 など" autocomplete="off">
+            <div class="error-msg" id="err-wi-purpose"></div>
+          </div>
+          <div class="btn-row">
+            <button class="walkin-btn walkin-btn--outline" id="btn-step2-back" style="flex:.4">← 戻る</button>
+            <button class="walkin-btn walkin-btn--gold" id="btn-step2-next" style="flex:1">確認へ →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: 確認 -->
+    <div class="walkin-step" id="step-3">
+      <div class="walkin-card">
+        <div class="step-indicator">
+          <div class="step-dot step-dot--done"></div>
+          <div class="step-dot step-dot--done"></div>
+          <div class="step-dot step-dot--active"></div>
+        </div>
+        <div class="walkin-card__title">内容のご確認</div>
+        <div class="walkin-card__sub">以下の内容で申請します</div>
+        <div id="confirm-summary" style="margin-bottom:20px;"></div>
+        <div class="btn-row">
+          <button class="walkin-btn walkin-btn--outline" id="btn-step3-back" style="flex:.4">← 戻る</button>
+          <button class="walkin-btn walkin-btn--gold" id="btn-submit" style="flex:1">申請する</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 4: 完了 -->
+    <div class="walkin-step" id="step-4">
+      <div class="walkin-card" style="text-align:center;">
+        <div class="success-icon">✓</div>
+        <div class="walkin-card__title" style="text-align:center;">申請完了</div>
+        <div class="walkin-card__sub" style="text-align:center;margin-bottom:24px;">
+          受付番号をスタッフにお知らせください
+        </div>
+        <div class="success-number" id="receipt-number">—</div>
+        <div class="success-label">受付番号</div>
+        <p style="color:rgba(255,255,255,.4);font-size:14px;margin-top:24px;line-height:1.7;">
+          部署の担当者が確認後、受付よりご案内いたします。<br>
+          しばらくこちらでお待ちください。
+        </p>
+        <button class="walkin-btn walkin-btn--outline" id="btn-reset" style="margin-top:32px;">最初に戻る</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script>
+'use strict';
+
+// ---- 時計 ----
+(function() {
+  if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  const clockEl = document.getElementById('walkin-clock');
+  const dateEl  = document.getElementById('walkin-date');
+  function tick() {
+    const now = new Date();
+    if (clockEl) clockEl.textContent = now.toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' });
+    if (dateEl)  dateEl.textContent  = now.toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
+  }
+  tick(); setInterval(tick, 1000);
+})();
+
+// ---- ユーティリティ ----
+function sanitize(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function showErrMsg(id, msg) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = msg;
+}
+function clearErrMsg(id) { showErrMsg(id, ''); }
+
+// ---- ステップ管理 ----
+let currentStep = 1;
+function goStep(n) {
+  document.querySelectorAll('.walkin-step').forEach(el => el.classList.remove('walkin-step--active'));
+  const target = document.getElementById('step-' + n);
+  if (target) target.classList.add('walkin-step--active');
+  currentStep = n;
+}
+
+// ---- 部署・担当者 ----
+async function loadDepartments() {
+  const sel = document.getElementById('wi-department');
+  try {
+    const snap = await db.collection('departments').where('isActive','==',true).orderBy('name').get();
+    snap.docs.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.id;
+      opt.dataset.name = d.data().name;
+      opt.textContent = d.data().name;
+      sel.appendChild(opt);
+    });
+  } catch(e) { console.warn('Dept load error:', e); }
+}
+
+async function loadHosts(deptId) {
+  const sel = document.getElementById('wi-host');
+  sel.innerHTML = '<option value="">担当者を選択</option>';
+  if (!deptId) return;
+  try {
+    const snap = await db.collection('employees')
+      .where('departmentId','==',deptId)
+      .where('isActive','==',true)
+      .orderBy('name').get();
+    snap.docs.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.id;
+      opt.dataset.name = d.data().name;
+      opt.textContent  = d.data().name;
+      sel.appendChild(opt);
+    });
+  } catch(e) { console.warn('Host load error:', e); }
+}
+
+document.getElementById('wi-department').addEventListener('change', function() {
+  loadHosts(this.value);
+});
+
+// ---- STEP 1 バリデーション ----
+document.getElementById('btn-step1-next').addEventListener('click', () => {
+  let valid = true;
+  const name    = document.getElementById('wi-name').value.trim();
+  const company = document.getElementById('wi-company').value.trim();
+  const phone   = document.getElementById('wi-phone').value.trim();
+  const email   = document.getElementById('wi-email').value.trim();
+
+  clearErrMsg('err-wi-name'); clearErrMsg('err-wi-company');
+  clearErrMsg('err-wi-phone'); clearErrMsg('err-wi-email');
+
+  if (!name)    { showErrMsg('err-wi-name',    'お名前は必須です'); valid = false; }
+  else if (name.length > 100) { showErrMsg('err-wi-name', '100文字以内で入力してください'); valid = false; }
+  if (!company) { showErrMsg('err-wi-company', '会社名は必須です'); valid = false; }
+  else if (company.length > 200) { showErrMsg('err-wi-company', '200文字以内で入力してください'); valid = false; }
+  if (phone && !/^[\d\-\+\(\)\s]{7,20}$/.test(phone)) { showErrMsg('err-wi-phone', '電話番号の形式が正しくありません'); valid = false; }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showErrMsg('err-wi-email', 'メールアドレスの形式が正しくありません'); valid = false; }
+
+  // XSS チェック
+  const xssPattern = /<script|javascript:|on\w+=/i;
+  if ([name, company, phone, email].some(v => xssPattern.test(v))) {
+    alert('使用できない文字が含まれています');
+    return;
+  }
+
+  if (valid) goStep(2);
+});
+
+// ---- STEP 2 バリデーション ----
+document.getElementById('btn-step2-back').addEventListener('click', () => goStep(1));
+document.getElementById('btn-step2-next').addEventListener('click', () => {
+  let valid = true;
+  const deptSel = document.getElementById('wi-department');
+  const hostSel = document.getElementById('wi-host');
+  const purpose = document.getElementById('wi-purpose').value.trim();
+
+  clearErrMsg('err-wi-dept'); clearErrMsg('err-wi-host'); clearErrMsg('err-wi-purpose');
+
+  if (!deptSel.value) { showErrMsg('err-wi-dept',    '訪問部署を選択してください'); valid = false; }
+  if (!hostSel.value) { showErrMsg('err-wi-host',    '訪問相手を選択してください'); valid = false; }
+  if (!purpose)       { showErrMsg('err-wi-purpose', 'ご用件は必須です'); valid = false; }
+  else if (purpose.length > 500) { showErrMsg('err-wi-purpose', '500文字以内で入力してください'); valid = false; }
+
+  if (valid) {
+    renderConfirm();
+    goStep(3);
+  }
+});
+
+// ---- STEP 3 確認画面 ----
+document.getElementById('btn-step3-back').addEventListener('click', () => goStep(2));
+
+function renderConfirm() {
+  const deptSel = document.getElementById('wi-department');
+  const hostSel = document.getElementById('wi-host');
+  const rows = [
+    ['お名前',     document.getElementById('wi-name').value.trim()],
+    ['会社名',     document.getElementById('wi-company').value.trim()],
+    ['電話番号',   document.getElementById('wi-phone').value.trim() || '—'],
+    ['メール',     document.getElementById('wi-email').value.trim() || '—'],
+    ['訪問部署',   deptSel.options[deptSel.selectedIndex]?.text || '—'],
+    ['訪問相手',   hostSel.options[hostSel.selectedIndex]?.text || '—'],
+    ['ご用件',     document.getElementById('wi-purpose').value.trim()],
+  ];
+  const html = `<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;">
+    ${rows.map(([label, val], i) => `
+      <div style="display:grid;grid-template-columns:120px 1fr;gap:16px;padding:14px 20px;${i > 0 ? 'border-top:1px solid rgba(255,255,255,.06);' : ''}">
+        <span style="font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.4);">${sanitize(label)}</span>
+        <span style="color:rgba(255,255,255,.85);font-size:15px;">${sanitize(val)}</span>
+      </div>
+    `).join('')}
+  </div>`;
+  document.getElementById('confirm-summary').innerHTML = html;
+}
+
+// ---- 申請送信 ----
+document.getElementById('btn-submit').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.textContent = '送信中...';
+
+  const deptSel = document.getElementById('wi-department');
+  const hostSel = document.getElementById('wi-host');
+
+  const data = {
+    name:           document.getElementById('wi-name').value.trim(),
+    company:        document.getElementById('wi-company').value.trim(),
+    phone:          document.getElementById('wi-phone').value.trim() || '',
+    email:          document.getElementById('wi-email').value.trim() || '',
+    departmentId:   deptSel.value,
+    departmentName: deptSel.options[deptSel.selectedIndex]?.text || '',
+    hostId:         hostSel.value,
+    hostName:       hostSel.options[hostSel.selectedIndex]?.text || '',
+    purpose:        document.getElementById('wi-purpose').value.trim(),
+    status:         'pending',
+    submittedAt:    firebase.firestore.FieldValue.serverTimestamp(),
+    receiptNumber:  generateReceiptNumber()
+  };
+
+  try {
+    await db.collection('walkIns').add(data);
+
+    document.getElementById('receipt-number').textContent = data.receiptNumber;
+    goStep(4);
+
+    // 5分後に自動リセット
+    setTimeout(() => {
+      if (currentStep === 4) resetForm();
+    }, 5 * 60 * 1000);
+
+  } catch(e) {
+    alert('申請に失敗しました。スタッフにお声がけください。\n' + e.message);
+    btn.disabled = false;
+    btn.textContent = '申請する';
+  }
+});
+
+function generateReceiptNumber() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `W${pad(now.getHours())}${pad(now.getMinutes())}-${Math.floor(Math.random() * 9000) + 1000}`;
+}
+
+// ---- リセット ----
+document.getElementById('btn-reset').addEventListener('click', resetForm);
+function resetForm() {
+  document.getElementById('wi-name').value    = '';
+  document.getElementById('wi-company').value = '';
+  document.getElementById('wi-phone').value   = '';
+  document.getElementById('wi-email').value   = '';
+  document.getElementById('wi-department').value = '';
+  document.getElementById('wi-host').innerHTML = '<option value="">担当者を選択</option>';
+  document.getElementById('wi-purpose').value = '';
+  document.querySelectorAll('.error-msg').forEach(el => el.textContent = '');
+  document.getElementById('btn-submit').disabled = false;
+  document.getElementById('btn-submit').textContent = '申請する';
+  goStep(1);
+}
+
+// ---- 初期ロード ----
+loadDepartments();
+</script>
+</body>
+</html>
