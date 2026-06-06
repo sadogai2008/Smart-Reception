@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Reception — システム管理</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.admin-section { margin-bottom: 32px; }
+.user-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+.user-card:last-child { border-bottom: none; }
+.badge-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+.badge-item:last-child { border-bottom: none; }
+.log-entry {
+  display: grid;
+  grid-template-columns: 160px 100px 1fr 120px;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 12px;
+  align-items: center;
+}
+.log-entry:last-child { border-bottom: none; }
+.log-entry:hover { background: var(--color-surface-2); }
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media(max-width:768px) { .settings-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar__brand">
+      <div class="sidebar__logo">Smart Reception</div>
+      <div class="sidebar__subtitle">Admin Console</div>
+    </div>
+    <div class="sidebar__user">
+      <div class="sidebar__user-name" id="nav-user-name">—</div>
+      <div class="sidebar__user-role" id="nav-user-role">—</div>
+    </div>
+    <nav class="sidebar__nav">
+      <div class="nav__section">メイン</div>
+      <a class="nav__link" href="index.html"><i class="nav__icon">⊞</i>ダッシュボード</a>
+      <a class="nav__link" href="reception.html"><i class="nav__icon">🎫</i>受付管理</a>
+      <a class="nav__link" href="department.html"><i class="nav__icon">✅</i>部署承認</a>
+      <div class="nav__section">管理</div>
+      <a class="nav__link nav__link--active" href="admin.html"><i class="nav__icon">⚙</i>システム管理</a>
+    </nav>
+    <div class="sidebar__footer">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <span style="font-size:12px;color:rgba(255,255,255,.4);">ダークモード</span>
+        <button class="theme-toggle" id="theme-toggle"></button>
+      </div>
+      <button class="btn btn--ghost js-signout" style="width:100%;color:rgba(255,255,255,.5);border-color:rgba(255,255,255,.1);">
+        サインアウト
+      </button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="main-wrap">
+    <header class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+        <h1 class="topbar__title">システム管理</h1>
+      </div>
+      <div class="topbar__actions">
+        <span class="topbar__time" id="topbar-clock">--:--</span>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- タブ -->
+      <div class="tabs">
+        <button class="tab tab--active" data-tab="admin-users">ユーザー管理</button>
+        <button class="tab" data-tab="admin-depts">部署・社員</button>
+        <button class="tab" data-tab="admin-badges">入館証管理</button>
+        <button class="tab" data-tab="admin-logs">ログ</button>
+        <button class="tab" data-tab="admin-settings">設定</button>
+        <button class="tab" data-tab="admin-init">初期データ</button>
+      </div>
+
+      <!-- ユーザー管理 -->
+      <div class="tab-panel tab-panel--active" id="tab-admin-users">
+        <div class="card admin-section">
+          <div class="card__header">
+            <h3 class="card__title">ユーザー一覧</h3>
+            <button class="btn btn--gold btn--sm" id="btn-add-user">＋ ユーザー追加</button>
+          </div>
+          <div id="user-list">
+            <div style="padding:24px;text-align:center;color:var(--color-text-3);">読み込み中...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 部署・社員管理 -->
+      <div class="tab-panel" id="tab-admin-depts">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+          <div class="card">
+            <div class="card__header">
+              <h3 class="card__title">部署一覧</h3>
+              <button class="btn btn--gold btn--sm" id="btn-add-dept">＋ 部署追加</button>
+            </div>
+            <div id="dept-list">
+              <div style="padding:24px;text-align:center;color:var(--color-text-3);">読み込み中...</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card__header">
+              <h3 class="card__title">社員一覧</h3>
+              <button class="btn btn--gold btn--sm" id="btn-add-emp">＋ 社員追加</button>
+            </div>
+            <div id="emp-list">
+              <div style="padding:24px;text-align:center;color:var(--color-text-3);">読み込み中...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 入館証管理 -->
+      <div class="tab-panel" id="tab-admin-badges">
+        <div class="card admin-section">
+          <div class="card__header">
+            <h3 class="card__title">入館証一覧</h3>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn--outline btn--sm" id="btn-export-badges">CSV</button>
+              <button class="btn btn--gold btn--sm" id="btn-bulk-badges">一括生成</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>番号</th><th>状態</th><th>使用者</th><th>発行時刻</th><th>操作</th></tr>
+              </thead>
+              <tbody id="badge-list">
+                <tr><td colspan="5" style="padding:24px;text-align:center;color:var(--color-text-3);">読み込み中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ログ -->
+      <div class="tab-panel" id="tab-admin-logs">
+        <div class="card admin-section">
+          <div class="card__header">
+            <h3 class="card__title">操作ログ</h3>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <select class="form-control" id="log-filter" style="width:auto;padding:6px 12px;font-size:13px;">
+                <option value="">すべて</option>
+                <option value="checkin">入館</option>
+                <option value="checkout">退館</option>
+                <option value="reservation">予約</option>
+                <option value="walkin">当日受付</option>
+                <option value="email">メール</option>
+                <option value="alert">アラート</option>
+              </select>
+              <button class="btn btn--outline btn--sm" id="btn-export-logs">CSV</button>
+            </div>
+          </div>
+          <div style="padding:0 16px;">
+            <div class="log-entry" style="font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-3);background:var(--color-bg-2);border-radius:8px;margin:8px 0;">
+              <span>日時</span><span>種別</span><span>内容</span><span>ユーザー</span>
+            </div>
+          </div>
+          <div id="log-list" style="max-height:600px;overflow-y:auto;">
+            <div style="padding:24px;text-align:center;color:var(--color-text-3);">読み込み中...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 設定 -->
+      <div class="tab-panel" id="tab-admin-settings">
+        <div class="card admin-section">
+          <div class="card__header">
+            <h3 class="card__title">施設設定</h3>
+          </div>
+          <div class="card__body">
+            <div class="settings-grid">
+              <div class="form-group">
+                <label class="form-label">施設名</label>
+                <input class="form-control" id="s-facility" type="text" placeholder="○○ビル">
+              </div>
+              <div class="form-group">
+                <label class="form-label">住所</label>
+                <input class="form-control" id="s-address" type="text" placeholder="東京都○○区...">
+              </div>
+              <div class="form-group">
+                <label class="form-label">フロア・受付場所</label>
+                <input class="form-control" id="s-floor" type="text" placeholder="3F 受付">
+              </div>
+              <div class="form-group">
+                <label class="form-label">代表電話</label>
+                <input class="form-control" id="s-tel" type="tel" placeholder="03-0000-0000">
+              </div>
+              <div class="form-group">
+                <label class="form-label">未退館アラート（時間）</label>
+                <input class="form-control" id="s-overstay" type="number" min="1" max="24" value="3">
+              </div>
+              <div class="form-group">
+                <label class="form-label">前日リマインド送信時刻</label>
+                <input class="form-control" id="s-reminder-time" type="time" value="09:00">
+              </div>
+            </div>
+            <button class="btn btn--gold" id="btn-save-settings" style="margin-top:16px;">設定を保存</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 初期データ -->
+      <div class="tab-panel" id="tab-admin-init">
+        <div class="card admin-section">
+          <div class="card__header">
+            <h3 class="card__title">初期データ生成</h3>
+          </div>
+          <div class="card__body">
+            <p style="color:var(--color-text-2);margin-bottom:20px;">新規プロジェクトの初期データを生成します。<br>既存データは上書きされません。</p>
+            <div style="display:flex;flex-direction:column;gap:12px;max-width:400px;">
+              <button class="btn btn--outline" id="btn-init-badges">入館証を生成（A001〜A050）</button>
+              <button class="btn btn--outline" id="btn-init-settings">初期設定を作成</button>
+            </div>
+            <div id="init-result" style="margin-top:16px;"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ユーザー追加モーダル -->
+<div class="modal" id="modal-add-user">
+  <div class="modal__box">
+    <div class="modal__header">
+      <h2 class="modal__title">ユーザー追加</h2>
+      <button class="modal__close" onclick="closeModal('modal-add-user')">✕</button>
+    </div>
+    <div class="modal__body">
+      <div class="form-group">
+        <label class="form-label form-label--required">表示名</label>
+        <input class="form-control" id="nu-name" type="text" placeholder="山田 太郎">
+      </div>
+      <div class="form-group">
+        <label class="form-label form-label--required">メールアドレス</label>
+        <input class="form-control" id="nu-email" type="email" placeholder="user@example.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label form-label--required">初期パスワード</label>
+        <input class="form-control" id="nu-password" type="password" placeholder="8文字以上">
+      </div>
+      <div class="form-group">
+        <label class="form-label form-label--required">権限</label>
+        <select class="form-control" id="nu-role">
+          <option value="receptionist">受付担当者</option>
+          <option value="department">部署担当者</option>
+          <option value="employee">社員</option>
+          <option value="admin">管理者</option>
+        </select>
+      </div>
+      <div class="form-group" id="nu-dept-wrap">
+        <label class="form-label">部署</label>
+        <select class="form-control" id="nu-dept">
+          <option value="">部署を選択</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn--outline" onclick="closeModal('modal-add-user')">キャンセル</button>
+      <button class="btn btn--gold" id="btn-create-user">作成</button>
+    </div>
+  </div>
+</div>
+
+<!-- 部署追加モーダル -->
+<div class="modal" id="modal-add-dept">
+  <div class="modal__box">
+    <div class="modal__header">
+      <h2 class="modal__title">部署追加</h2>
+      <button class="modal__close" onclick="closeModal('modal-add-dept')">✕</button>
+    </div>
+    <div class="modal__body">
+      <div class="form-group">
+        <label class="form-label form-label--required">部署名</label>
+        <input class="form-control" id="nd-name" type="text" placeholder="営業部">
+      </div>
+      <div class="form-group">
+        <label class="form-label">説明</label>
+        <input class="form-control" id="nd-desc" type="text" placeholder="任意の説明">
+      </div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn--outline" onclick="closeModal('modal-add-dept')">キャンセル</button>
+      <button class="btn btn--gold" id="btn-create-dept">追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 社員追加モーダル -->
+<div class="modal" id="modal-add-emp">
+  <div class="modal__box">
+    <div class="modal__header">
+      <h2 class="modal__title">社員追加</h2>
+      <button class="modal__close" onclick="closeModal('modal-add-emp')">✕</button>
+    </div>
+    <div class="modal__body">
+      <div class="form-group">
+        <label class="form-label form-label--required">氏名</label>
+        <input class="form-control" id="ne-name" type="text" placeholder="山田 太郎">
+      </div>
+      <div class="form-group">
+        <label class="form-label form-label--required">メールアドレス</label>
+        <input class="form-control" id="ne-email" type="email" placeholder="employee@example.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label form-label--required">部署</label>
+        <select class="form-control" id="ne-dept">
+          <option value="">部署を選択</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">役職</label>
+        <input class="form-control" id="ne-title" type="text" placeholder="部長・課長 など">
+      </div>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn--outline" onclick="closeModal('modal-add-emp')">キャンセル</button>
+      <button class="btn btn--gold" id="btn-create-emp">追加</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/app.js"></script>
+<script>
+'use strict';
+
+initAuth([ROLES.ADMIN], onReady);
+
+let allLogs   = [];
+let allBadges = [];
+
+function onReady(user, profile) {
+  initNav();
+  startClock();
+  initMobileNav();
+  initThemeToggle();
+  initTabs();
+  loadUsers();
+  loadDeptEmpList();
+  loadBadges();
+  loadLogs();
+  loadSettings();
+  initModals();
+  initInit();
+}
+
+function initTabs() {
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(b => b.classList.remove('tab--active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('tab-panel--active'));
+      btn.classList.add('tab--active');
+      const panel = document.getElementById('tab-' + btn.dataset.tab);
+      if (panel) panel.classList.add('tab-panel--active');
+    });
+  });
+}
+
+// ---- ユーザー管理 ----
+async function loadUsers() {
+  const listEl = document.getElementById('user-list');
+  try {
+    const snap = await db.collection('users').orderBy('displayName').get();
+    if (snap.empty) { listEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--color-text-3);">ユーザーはいません</div>'; return; }
+    const roleLabels = { admin:'管理者', receptionist:'受付', department:'部署担当', employee:'社員' };
+    listEl.innerHTML = snap.docs.map(d => {
+      const u = d.data();
+      return `<div class="user-card">
+        <div>
+          <div style="font-weight:600;">${sanitize(u.displayName || '-')}</div>
+          <div style="font-size:13px;color:var(--color-text-3);">${sanitize(u.email || '-')}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="badge badge--${u.isActive ? 'confirmed' : 'rejected'}">${sanitize(roleLabels[u.role] || u.role)}</span>
+          <button class="btn btn--outline btn--sm" onclick="toggleUserActive('${d.id}', ${u.isActive})">${u.isActive ? '無効化' : '有効化'}</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { listEl.innerHTML = `<div style="padding:24px;color:var(--color-error);">読み込みエラー: ${sanitize(e.message)}</div>`; }
+}
+
+async function toggleUserActive(uid, currentActive) {
+  if (!confirm(`このユーザーを${currentActive ? '無効化' : '有効化'}しますか？`)) return;
+  try {
+    await db.collection('users').doc(uid).update({ isActive: !currentActive });
+    await writeLog('user_status_changed', 'user', uid, 'user', { isActive: !currentActive });
+    showToast('ユーザーステータスを変更しました', 'success');
+    loadUsers();
+  } catch(e) { showToast('エラー: ' + e.message, 'error'); }
+}
+
+// ---- 部署・社員 ----
+async function loadDeptEmpList() {
+  const deptEl = document.getElementById('dept-list');
+  const empEl  = document.getElementById('emp-list');
+  try {
+    const dSnap = await db.collection('departments').orderBy('name').get();
+    deptEl.innerHTML = dSnap.docs.map(d => `
+      <div class="badge-item">
+        <div>
+          <div style="font-weight:600;">${sanitize(d.data().name)}</div>
+          <div style="font-size:12px;color:var(--color-text-3);">${sanitize(d.data().description || '')}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="badge badge--${d.data().isActive ? 'confirmed' : 'rejected'}">${d.data().isActive ? '有効' : '無効'}</span>
+          <button class="btn btn--outline btn--sm" onclick="toggleDept('${d.id}', ${d.data().isActive})">${d.data().isActive ? '無効化' : '有効化'}</button>
+        </div>
+      </div>
+    `).join('') || '<div style="padding:24px;text-align:center;color:var(--color-text-3);">部署はありません</div>';
+
+    const eSnap = await db.collection('employees').orderBy('name').get();
+    empEl.innerHTML = eSnap.docs.map(e => `
+      <div class="badge-item">
+        <div>
+          <div style="font-weight:600;">${sanitize(e.data().name)}</div>
+          <div style="font-size:12px;color:var(--color-text-3);">${sanitize(e.data().email || '')}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="badge badge--${e.data().isActive ? 'confirmed' : 'rejected'}" style="font-size:10px;">${sanitize(e.data().departmentName || '-')}</span>
+          <button class="btn btn--outline btn--sm" onclick="toggleEmp('${e.id}', ${e.data().isActive})">${e.data().isActive ? '無効化' : '有効化'}</button>
+        </div>
+      </div>
+    `).join('') || '<div style="padding:24px;text-align:center;color:var(--color-text-3);">社員はいません</div>';
+  } catch(e) { console.error(e); }
+}
+
+async function toggleDept(id, active) {
+  await db.collection('departments').doc(id).update({ isActive: !active });
+  loadDeptEmpList();
+}
+async function toggleEmp(id, active) {
+  await db.collection('employees').doc(id).update({ isActive: !active });
+  loadDeptEmpList();
+}
+
+// ---- 入館証 ----
+async function loadBadges() {
+  const tbody = document.getElementById('badge-list');
+  try {
+    const snap = await db.collection('badges').orderBy('badgeNumber').get();
+    allBadges = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (snap.empty) { tbody.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--color-text-3);">入館証はありません</td></tr>'; return; }
+    tbody.innerHTML = allBadges.map(b => `<tr>
+      <td><span class="badge badge--gold">${sanitize(b.badgeNumber)}</span></td>
+      <td><span class="badge badge--${b.status === 'available' ? 'available' : b.status === 'in_use' ? 'in_use' : 'rejected'}">${b.status === 'available' ? '利用可能' : b.status === 'in_use' ? '使用中' : b.status}</span></td>
+      <td>${sanitize(b.currentVisitorName || '-')}</td>
+      <td>${b.issuedAt ? formatDateTime(b.issuedAt) : '-'}</td>
+      <td>
+        ${b.status === 'in_use' ? `<button class="btn btn--outline btn--sm" onclick="forceBadgeReturn('${b.id}')">強制返却</button>` : '—'}
+      </td>
+    </tr>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function forceBadgeReturn(badgeId) {
+  if (!confirm('この入館証を強制返却しますか？')) return;
+  try {
+    await db.collection('badges').doc(badgeId).update({
+      status: BADGE_STATUS.AVAILABLE,
+      currentCheckinId: null,
+      currentVisitorName: null,
+      returnedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt:  firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await writeLog('badge_force_returned', 'badge', badgeId, 'badge', {});
+    showToast('入館証を強制返却しました', 'success');
+    loadBadges();
+  } catch(e) { showToast('エラー: ' + e.message, 'error'); }
+}
+
+document.getElementById('btn-export-badges').addEventListener('click', () => {
+  exportCSV(allBadges.map(b => ({
+    '入館証番号': b.badgeNumber, '状態': b.status,
+    '使用者': b.currentVisitorName || '-', '発行日時': b.issuedAt ? formatDateTime(b.issuedAt) : '-'
+  })), 'badges.csv');
+});
+
+document.getElementById('btn-bulk-badges').addEventListener('click', async () => {
+  if (!confirm('A001〜A050の入館証を生成しますか？（既存は上書きされません）')) return;
+  showLoading('生成中...');
+  try {
+    const batch = db.batch();
+    for (let i = 1; i <= 50; i++) {
+      const num = 'A' + String(i).padStart(3, '0');
+      const existSnap = await db.collection('badges').where('badgeNumber', '==', num).get();
+      if (existSnap.empty) {
+        const ref = db.collection('badges').doc();
+        batch.set(ref, {
+          badgeNumber: num, status: BADGE_STATUS.AVAILABLE,
+          currentCheckinId: null, currentVisitorName: null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+    }
+    await batch.commit();
+    showToast('入館証を生成しました', 'success');
+    loadBadges();
+  } catch(e) { showToast('エラー: ' + e.message, 'error'); } finally { hideLoading(); }
+});
+
+// ---- ログ ----
+async function loadLogs(category = '') {
+  const listEl = document.getElementById('log-list');
+  try {
+    let q = db.collection('logs').orderBy('createdAt', 'desc').limit(200);
+    if (category) q = db.collection('logs').where('category', '==', category).orderBy('createdAt', 'desc').limit(200);
+    const snap = await q.get();
+    allLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (snap.empty) { listEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--color-text-3);">ログはありません</div>'; return; }
+    const actionLabels = {
+      checkin:'入館', checkout:'退館', reservation_created:'予約作成',
+      walkin_approved:'当日承認', walkin_rejected:'当日拒否',
+      reminder_sent:'リマインド送信', overstay_alert:'未退館アラート',
+      badge_force_returned:'入館証強制返却', user_status_changed:'ユーザー変更'
+    };
+    listEl.innerHTML = allLogs.map(l => `<div class="log-entry">
+      <span style="color:var(--color-text-3);">${formatDateTime(l.createdAt)}</span>
+      <span><span class="badge badge--confirmed" style="font-size:10px;">${sanitize(l.category || '-')}</span></span>
+      <span>${sanitize(actionLabels[l.action] || l.action)}${l.detail?.visitorName ? ` — ${sanitize(l.detail.visitorName)}` : ''}</span>
+      <span style="color:var(--color-text-3);">${sanitize(l.userName || '-')}</span>
+    </div>`).join('');
+  } catch(e) { listEl.innerHTML = `<div style="padding:24px;color:var(--color-error);">${sanitize(e.message)}</div>`; }
+}
+
+document.getElementById('log-filter').addEventListener('change', function() {
+  loadLogs(this.value);
+});
+
+document.getElementById('btn-export-logs').addEventListener('click', () => {
+  exportCSV(allLogs.map(l => ({
+    '日時': formatDateTime(l.createdAt), '種別': l.category,
+    '操作': l.action, '詳細': JSON.stringify(l.detail || {}),
+    'ユーザー': l.userName
+  })), `logs_${new Date().toLocaleDateString('ja-JP').replace(/\//g,'-')}.csv`);
+});
+
+// ---- 設定 ----
+async function loadSettings() {
+  try {
+    const snap = await db.collection('settings').doc('global').get();
+    if (snap.exists) {
+      const s = snap.data();
+      document.getElementById('s-facility').value      = s.facilityName || '';
+      document.getElementById('s-address').value       = s.address || '';
+      document.getElementById('s-floor').value         = s.floor || '';
+      document.getElementById('s-tel').value           = s.tel || '';
+      document.getElementById('s-overstay').value      = s.overstayHours || 3;
+      document.getElementById('s-reminder-time').value = s.reminderTime || '09:00';
+    }
+  } catch(e) { console.warn('Settings load error:', e); }
+}
+
+document.getElementById('btn-save-settings').addEventListener('click', async () => {
+  try {
+    await db.collection('settings').doc('global').set({
+      facilityName:  document.getElementById('s-facility').value.trim(),
+      address:       document.getElementById('s-address').value.trim(),
+      floor:         document.getElementById('s-floor').value.trim(),
+      tel:           document.getElementById('s-tel').value.trim(),
+      overstayHours: parseInt(document.getElementById('s-overstay').value) || 3,
+      reminderTime:  document.getElementById('s-reminder-time').value,
+      updatedAt:     firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    await writeLog('settings_changed', 'settings', 'global', 'settings', {});
+    showToast('設定を保存しました', 'success');
+    _settingsCache = null; // キャッシュクリア
+  } catch(e) { showToast('設定保存エラー: ' + e.message, 'error'); }
+});
+
+// ---- モーダル ----
+function initModals() {
+  // ユーザー追加
+  document.getElementById('btn-add-user').addEventListener('click', async () => {
+    await populateDepartmentSelect('nu-dept');
+    openModal('modal-add-user');
+  });
+
+  document.getElementById('nu-role').addEventListener('change', function() {
+    document.getElementById('nu-dept-wrap').style.display =
+      ['department', 'employee'].includes(this.value) ? 'block' : 'none';
+  });
+  document.getElementById('nu-dept-wrap').style.display = 'none';
+
+  document.getElementById('btn-create-user').addEventListener('click', async () => {
+    const name     = document.getElementById('nu-name').value.trim();
+    const email    = document.getElementById('nu-email').value.trim();
+    const password = document.getElementById('nu-password').value;
+    const role     = document.getElementById('nu-role').value;
+    const deptSel  = document.getElementById('nu-dept');
+    const deptId   = deptSel.value;
+    const deptName = deptSel.options[deptSel.selectedIndex]?.text || '';
+
+    if (!name || !email || !password) { showToast('必須項目を入力してください', 'warning'); return; }
+    if (password.length < 8) { showToast('パスワードは8文字以上にしてください', 'warning'); return; }
+
+    showLoading('ユーザーを作成中...');
+    try {
+      // Firebase Auth でユーザー作成（管理者APIがないためクライアント側でサインアップ後、Firestoreへ）
+      // 注意: 本番環境ではCloud Functionsを使用することを推奨
+      const tempAuth = firebase.auth();
+      const credential = await tempAuth.createUserWithEmailAndPassword(email, password);
+      const uid = credential.user.uid;
+
+      await db.collection('users').doc(uid).set({
+        displayName: name, email, role,
+        departmentId:   deptId || null,
+        departmentName: deptName || null,
+        isActive:  true,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy: currentUser.uid
+      });
+
+      await writeLog('user_created', 'user', uid, 'user', { email, role });
+
+      // 作成後、現在の管理者セッションに戻る（再サインイン）
+      // ※ 簡易実装: 本番環境ではAdmin SDKを推奨
+      showToast(`ユーザー「${name}」を作成しました`, 'success');
+      closeModal('modal-add-user');
+      loadUsers();
+    } catch(e) {
+      showToast('ユーザー作成エラー: ' + e.message, 'error');
+    } finally { hideLoading(); }
+  });
+
+  // 部署追加
+  document.getElementById('btn-add-dept').addEventListener('click', () => openModal('modal-add-dept'));
+  document.getElementById('btn-create-dept').addEventListener('click', async () => {
+    const name = document.getElementById('nd-name').value.trim();
+    const desc = document.getElementById('nd-desc').value.trim();
+    if (!name) { showToast('部署名を入力してください', 'warning'); return; }
+    try {
+      await db.collection('departments').add({
+        name, description: desc, isActive: true,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      _deptCache = null;
+      showToast('部署を追加しました', 'success');
+      closeModal('modal-add-dept');
+      loadDeptEmpList();
+    } catch(e) { showToast('エラー: ' + e.message, 'error'); }
+  });
+
+  // 社員追加
+  document.getElementById('btn-add-emp').addEventListener('click', async () => {
+    await populateDepartmentSelect('ne-dept');
+    openModal('modal-add-emp');
+  });
+  document.getElementById('btn-create-emp').addEventListener('click', async () => {
+    const name    = document.getElementById('ne-name').value.trim();
+    const email   = document.getElementById('ne-email').value.trim();
+    const deptSel = document.getElementById('ne-dept');
+    const deptId  = deptSel.value;
+    const deptName= deptSel.options[deptSel.selectedIndex]?.text || '';
+    const title   = document.getElementById('ne-title').value.trim();
+
+    if (!name || !email || !deptId) { showToast('必須項目を入力してください', 'warning'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('メールアドレスの形式が正しくありません', 'warning'); return; }
+
+    try {
+      await db.collection('employees').add({
+        name, email, departmentId: deptId, departmentName: deptName,
+        title: title || '', isActive: true,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      showToast('社員を追加しました', 'success');
+      closeModal('modal-add-emp');
+      loadDeptEmpList();
+    } catch(e) { showToast('エラー: ' + e.message, 'error'); }
+  });
+}
+
+// ---- 初期データ生成 ----
+function initInit() {
+  document.getElementById('btn-init-badges').addEventListener('click', async () => {
+    showLoading('入館証を生成中...');
+    try {
+      let count = 0;
+      const batch = db.batch();
+      for (let i = 1; i <= 50; i++) {
+        const num = 'A' + String(i).padStart(3, '0');
+        const existSnap = await db.collection('badges').where('badgeNumber', '==', num).get();
+        if (existSnap.empty) {
+          const ref = db.collection('badges').doc();
+          batch.set(ref, {
+            badgeNumber: num, status: 'available',
+            currentCheckinId: null, currentVisitorName: null,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          count++;
+        }
+      }
+      await batch.commit();
+      document.getElementById('init-result').innerHTML =
+        `<div style="color:var(--color-success);padding:12px;background:var(--color-success-bg);border-radius:8px;">✓ ${count}件の入館証を生成しました（既存は除外）</div>`;
+      loadBadges();
+    } catch(e) {
+      document.getElementById('init-result').innerHTML =
+        `<div style="color:var(--color-error);padding:12px;background:var(--color-error-bg);border-radius:8px;">エラー: ${sanitize(e.message)}</div>`;
+    } finally { hideLoading(); }
+  });
+
+  document.getElementById('btn-init-settings').addEventListener('click', async () => {
+    try {
+      await db.collection('settings').doc('global').set({
+        facilityName: 'Smart Reception', address: '', floor: '1F 受付',
+        tel: '', overstayHours: 3, reminderTime: '09:00',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      document.getElementById('init-result').innerHTML =
+        `<div style="color:var(--color-success);padding:12px;background:var(--color-success-bg);border-radius:8px;">✓ 初期設定を作成しました</div>`;
+      loadSettings();
+    } catch(e) {
+      document.getElementById('init-result').innerHTML =
+        `<div style="color:var(--color-error);padding:12px;background:var(--color-error-bg);border-radius:8px;">エラー: ${sanitize(e.message)}</div>`;
+    }
+  });
+}
+</script>
+</body>
+</html>
