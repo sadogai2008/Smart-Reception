@@ -67,22 +67,15 @@
     btn.textContent = 'ログイン中...';
     btn.disabled = true;
 
-    try {
-      await auth.signInWithEmailAndPassword(email, password);
-      // onAuthStateChanged が発火してリダイレクト
-    } catch (err) {
-      const msgs = {
-        'auth/user-not-found':   'メールアドレスが見つかりません。',
-        'auth/wrong-password':   'パスワードが正しくありません。',
-        'auth/invalid-credential': 'メールアドレスまたはパスワードが正しくありません。',
-        'auth/too-many-requests':'ログイン試行回数が多すぎます。しばらくお待ちください。',
-        'auth/user-disabled':    'このアカウントは無効化されています。'
-      };
-      errEl.textContent = msgs[err.code] || 'ログインに失敗しました。';
-      errEl.style.display = 'block';
-      btn.textContent = 'ログイン';
-      btn.disabled = false;
-    }
+try {
+  await auth.signInWithEmailAndPassword(email, password);
+} catch (err) {
+  alert(err.code);
+  console.log(err);
+
+  btn.textContent = 'ログイン';
+  btn.disabled = false;
+}
   });
 })();
 </script>
