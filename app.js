@@ -1,4 +1,4 @@
-// js/app.js — 共通ロジック・認証・ユーティリティ
+// js/app.js — 共通ロジック・認証・ユーティリティ（完全版）
 'use strict';
 
 // ============================================================
@@ -37,9 +37,9 @@ const WALKIN_STATUS = {
 // ============================================================
 //  グローバル状態
 // ============================================================
-let currentUser   = null;
+let currentUser    = null;
 let currentProfile = null;
-let unsubscribers = [];
+let unsubscribers  = [];
 
 // ============================================================
 //  認証
@@ -71,18 +71,15 @@ function initAuth(requiredRoles, onReady) {
       }
       currentUser    = user;
       currentProfile = profile;
-      // ログイン時刻更新
-      db.collection('users').doc(user.uid).update({ lastLoginAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+      db.collection('users').doc(user.uid).update({
+        lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(() => {});
       if (typeof onReady === 'function') onReady(user, profile);
     } catch (err) {
       console.error('Auth error:', err);
       window.location.href = 'login.html';
     }
   });
-}
-
-async function signIn(email, password) {
-  return auth.signInWithEmailAndPassword(email, password);
 }
 
 async function signOut() {
@@ -96,8 +93,8 @@ async function signOut() {
 //  セキュリティ
 // ============================================================
 function sanitize(str) {
-  if (typeof str !== 'string') return '';
-  return str
+  if (str === null || str === undefined) return '';
+  return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -113,6 +110,58 @@ function generateToken(length = 32) {
 
 function generateId() {
   return generateToken(16);
+}
+
+// ============================================================
+//  バリデーション
+// ============================================================
+const VALIDATORS = {
+  required: (v) => v !== null && v !== undefined && String(v).trim().length > 0,
+  maxLen:   (v, n) => String(v).length <= n,
+  minLen:   (v, n) => String(v).length >= n,
+  email:    (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+  phone:    (v) => !v || /^[\d\-\+\(\)\s]{7,20}$/.test(v),
+  url:      (v) => !v || /^https?:\/\/.+/.test(v),
+  alphaNum: (v) => /^[a-zA-Z0-9_-]+$/.test(v),
+  noScript: (v) => !/<script|javascript:|on\w+=/i.test(v),
+};
+
+function validateField(value, rules) {
+  const errors = [];
+  if (rules.required && !VALIDATORS.required(value))  errors.push('必須項目です');
+  if (value && rules.email    && !VALIDATORS.email(value))    errors.push('メールアドレスの形式が正しくありません');
+  if (value && rules.phone    && !VALIDATORS.phone(value))    errors.push('電話番号の形式が正しくありません');
+  if (value && rules.maxLen   && !VALIDATORS.maxLen(value, rules.maxLen))   errors.push(`${rules.maxLen}文字以内で入力してください`);
+  if (value && rules.minLen   && !VALIDATORS.minLen(value, rules.minLen))   errors.push(`${rules.minLen}文字以上で入力してください`);
+  if (value && !VALIDATORS.noScript(value)) errors.push('使用できない文字が含まれています');
+  return errors;
+}
+
+function validateForm(fields) {
+  let valid = true;
+  const allErrors = {};
+  for (const [fieldId, rules] of Object.entries(fields)) {
+    const el = document.getElementById(fieldId);
+    if (!el) continue;
+    const errors = validateField(el.value, rules);
+    if (errors.length > 0) {
+      valid = false;
+      el.classList.add('form-control--error');
+      let errEl = el.parentElement.querySelector('.form-error');
+      if (!errEl) {
+        errEl = document.createElement('div');
+        errEl.className = 'form-error';
+        el.parentElement.appendChild(errEl);
+      }
+      errEl.textContent = errors[0];
+    } else {
+      el.classList.remove('form-control--error');
+      const errEl = el.parentElement.querySelector('.form-error');
+      if (errEl) errEl.textContent = '';
+    }
+    allErrors[fieldId] = errors;
+  }
+  return { valid, errors: allErrors };
 }
 
 // ============================================================
@@ -151,8 +200,30 @@ function todayEnd() {
   return firebase.firestore.Timestamp.fromDate(d);
 }
 
+function tomorrowStart() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(0, 0, 0, 0);
+  return firebase.firestore.Timestamp.fromDate(d);
+}
+
+function tomorrowEnd() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(23, 59, 59, 999);
+  return firebase.firestore.Timestamp.fromDate(d);
+}
+
 function isoToTimestamp(isoStr) {
   return firebase.firestore.Timestamp.fromDate(new Date(isoStr));
+}
+
+function calcStayDuration(checkinTs, checkoutTs) {
+  if (!checkinTs || !checkoutTs) return '-';
+  const inMs  = checkinTs.toDate  ? checkinTs.toDate().getTime()  : new Date(checkinTs).getTime();
+  const outMs = checkoutTs.toDate ? checkoutTs.toDate().getTime() : new Date(checkoutTs).getTime();
+  const min   = Math.round((outMs - inMs) / 60000);
+  return `${Math.floor(min / 60)}時間${min % 60}分`;
 }
 
 // ============================================================
@@ -165,6 +236,7 @@ async function writeLog(action, category, targetId, targetType, detail = {}) {
       userId:    currentUser ? currentUser.uid : 'anonymous',
       userName:  currentProfile ? currentProfile.displayName : 'anonymous',
       userAgent: navigator.userAgent,
+      ipHint:    '',  // サーバーサイドで設定
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
   } catch (e) { console.warn('Log write failed:', e); }
@@ -178,7 +250,7 @@ async function createNotification(type, title, message, relatedId, targetRole = 
     await db.collection('notifications').add({
       type, title, message, relatedId,
       targetRole, targetUserId,
-      isRead: false,
+      isRead:    false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
   } catch (e) { console.warn('Notification create failed:', e); }
@@ -200,12 +272,14 @@ async function sendEmail(templateId, params) {
   }
   if (EMAILJS_CONFIG.publicKey === 'YOUR_EMAILJS_PUBLIC_KEY') {
     console.info('[Demo] Email would be sent:', templateId, params);
-    return;
+    return { demo: true };
   }
   return emailjs.send(EMAILJS_CONFIG.serviceId, templateId, params);
 }
 
+// ① 来訪予約登録完了メール
 async function sendInviteEmail(reservation) {
+  const settings = await getSettings();
   const qrUrl = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}qr.html?token=${reservation.qrToken}&id=${reservation.id}`;
   return sendEmail(EMAILJS_CONFIG.templateInvite, {
     to_email:    reservation.visitorEmail,
@@ -215,28 +289,143 @@ async function sendInviteEmail(reservation) {
     employee:    reservation.employeeName || '',
     purpose:     reservation.purpose || '',
     qr_url:      qrUrl,
-    facility:    (await getSettings()).facilityName || 'Smart Reception'
+    facility:    settings.facilityName || 'Smart Reception',
+    address:     settings.address || '',
+    floor:       settings.floor || ''
   });
 }
 
+// ② 前日リマインドメール
+async function sendReminderEmail(reservation) {
+  const settings = await getSettings();
+  const qrUrl = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}qr.html?token=${reservation.qrToken}&id=${reservation.id}`;
+  return sendEmail(EMAILJS_CONFIG.templateReminder, {
+    to_email:    reservation.visitorEmail,
+    to_name:     reservation.visitorName,
+    visit_date:  formatDateTime(reservation.visitDate),
+    department:  reservation.departmentName || '',
+    employee:    reservation.employeeName || '',
+    qr_url:      qrUrl,
+    facility:    settings.facilityName || 'Smart Reception'
+  });
+}
+
+// ③ 受付完了通知 + ④ 入館通知
 async function sendCheckinEmail(checkin, employeeEmail) {
   return sendEmail(EMAILJS_CONFIG.templateCheckin, {
-    to_email:      employeeEmail,
-    visitor_name:  checkin.visitorName,
-    visitor_company: checkin.visitorCompany,
-    checkin_time:  formatDateTime(checkin.checkinAt),
-    badge_number:  checkin.badgeId,
-    receptionist:  checkin.receptionistName || ''
+    to_email:         employeeEmail,
+    visitor_name:     checkin.visitorName,
+    visitor_company:  checkin.visitorCompany,
+    checkin_time:     formatDateTime(checkin.checkinAt),
+    badge_number:     checkin.badgeId,
+    receptionist:     checkin.receptionistName || '',
+    department:       checkin.departmentName || ''
   });
 }
 
+// ⑤ 退館通知
 async function sendCheckoutEmail(checkin, employeeEmail) {
   return sendEmail(EMAILJS_CONFIG.templateCheckout, {
-    to_email:       employeeEmail,
-    visitor_name:   checkin.visitorName,
-    visitor_company:checkin.visitorCompany,
-    checkout_time:  formatDateTime(checkin.checkoutAt)
+    to_email:         employeeEmail,
+    visitor_name:     checkin.visitorName,
+    visitor_company:  checkin.visitorCompany,
+    checkout_time:    formatDateTime(checkin.checkoutAt),
+    stay_duration:    calcStayDuration(checkin.checkinAt, checkin.checkoutAt)
   });
+}
+
+// ⑥ 未退館アラート
+async function sendOverstayAlert(checkin, employeeEmail) {
+  return sendEmail(EMAILJS_CONFIG.templateAlert, {
+    to_email:         employeeEmail,
+    visitor_name:     checkin.visitorName,
+    visitor_company:  checkin.visitorCompany,
+    checkin_time:     formatDateTime(checkin.checkinAt),
+    badge_number:     checkin.badgeId,
+    hours_elapsed:    calcStayDuration(checkin.checkinAt, { toDate: () => new Date() })
+  });
+}
+
+// 承認通知メール
+async function sendApprovalEmail(walkIn, approved, reason = '') {
+  return sendEmail(EMAILJS_CONFIG.templateApproval, {
+    to_email:   walkIn.email || '',
+    to_name:    walkIn.name,
+    status:     approved ? '承認されました' : '拒否されました',
+    reason:     reason,
+    department: walkIn.departmentName || ''
+  });
+}
+
+// ============================================================
+//  前日リマインドスケジューラ（クライアントサイド）
+//  管理者・受付ログイン時に起動
+// ============================================================
+async function runReminderScheduler() {
+  try {
+    const snap = await db.collection('reservations')
+      .where('visitDate', '>=', tomorrowStart())
+      .where('visitDate', '<=', tomorrowEnd())
+      .where('status', 'in', [RESERVATION_STATUS.PENDING, RESERVATION_STATUS.CONFIRMED])
+      .get();
+
+    for (const doc of snap.docs) {
+      const r = doc.data();
+      const alreadySent = r.reminderSentAt;
+      if (alreadySent) continue;
+      try {
+        await sendReminderEmail({ ...r, id: doc.id });
+        await doc.ref.update({ reminderSentAt: firebase.firestore.FieldValue.serverTimestamp() });
+        await writeLog('reminder_sent', 'email', doc.id, 'reservation', { visitorName: r.visitorName });
+      } catch (e) {
+        console.warn('Reminder send failed:', e);
+      }
+    }
+  } catch (e) {
+    console.warn('Reminder scheduler error:', e);
+  }
+}
+
+// ============================================================
+//  未退館アラートスケジューラ（クライアントサイド）
+//  3時間以上在館で担当者へアラート
+// ============================================================
+async function runOverstayChecker() {
+  try {
+    const thresholdMs = 3 * 60 * 60 * 1000; // 3時間
+    const snap = await db.collection('checkins')
+      .where('status', '==', 'in')
+      .get();
+
+    for (const doc of snap.docs) {
+      const c = doc.data();
+      if (!c.checkinAt) continue;
+      const checkinMs = c.checkinAt.toDate ? c.checkinAt.toDate().getTime() : new Date(c.checkinAt).getTime();
+      const elapsed   = Date.now() - checkinMs;
+      if (elapsed < thresholdMs) continue;
+
+      // 1時間ごとに1回のみ送信
+      const lastAlertMs = c.lastAlertSentAt
+        ? (c.lastAlertSentAt.toDate ? c.lastAlertSentAt.toDate().getTime() : new Date(c.lastAlertSentAt).getTime())
+        : 0;
+      if (Date.now() - lastAlertMs < 60 * 60 * 1000) continue;
+
+      try {
+        if (c.employeeId) {
+          const empSnap = await db.collection('employees').doc(c.employeeId).get();
+          if (empSnap.exists) {
+            await sendOverstayAlert(c, empSnap.data().email);
+          }
+        }
+        await doc.ref.update({ lastAlertSentAt: firebase.firestore.FieldValue.serverTimestamp() });
+        await writeLog('overstay_alert', 'alert', doc.id, 'checkin', { visitorName: c.visitorName });
+      } catch (e) {
+        console.warn('Overstay alert failed:', e);
+      }
+    }
+  } catch (e) {
+    console.warn('Overstay checker error:', e);
+  }
 }
 
 // ============================================================
@@ -261,11 +450,11 @@ function generateQRCode(containerId, data, size = 200) {
   el.innerHTML = '';
   if (typeof QRCode !== 'undefined') {
     new QRCode(el, {
-      text: JSON.stringify(data),
-      width: size,
-      height: size,
-      colorDark: '#0a0f1e',
-      colorLight: '#ffffff',
+      text:         JSON.stringify(data),
+      width:        size,
+      height:       size,
+      colorDark:    '#0a0f1e',
+      colorLight:   '#ffffff',
       correctLevel: QRCode.CorrectLevel.H
     });
   }
@@ -309,6 +498,10 @@ function closeAllModals() {
   document.body.style.overflow = '';
 }
 
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('modal')) closeAllModals();
+});
+
 // ============================================================
 //  ローディング
 // ============================================================
@@ -317,10 +510,11 @@ function showLoading(msg = '処理中...') {
   if (!el) {
     el = document.createElement('div');
     el.id = 'global-loading';
-    el.innerHTML = `<div class="loading-inner"><div class="loading-spinner"></div><p>${msg}</p></div>`;
+    el.innerHTML = `<div class="loading-inner"><div class="loading-spinner"></div><p>${sanitize(msg)}</p></div>`;
     document.body.appendChild(el);
   } else {
-    el.querySelector('p').textContent = msg;
+    const p = el.querySelector('p');
+    if (p) p.textContent = msg;
   }
   el.style.display = 'flex';
 }
@@ -336,11 +530,11 @@ function exportCSV(data, filename) {
   if (!data || !data.length) { showToast('データがありません', 'warning'); return; }
   const headers = Object.keys(data[0]);
   const rows = data.map(row => headers.map(h => {
-    const v = String(row[h] || '').replace(/"/g, '""');
+    const v = String(row[h] === null || row[h] === undefined ? '' : row[h]).replace(/"/g, '""');
     return `"${v}"`;
   }).join(','));
-  const bom = '\uFEFF';
-  const csv = bom + [headers.join(','), ...rows].join('\n');
+  const bom  = '\uFEFF';
+  const csv  = bom + [headers.join(','), ...rows].join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -350,7 +544,7 @@ function exportCSV(data, filename) {
 }
 
 // ============================================================
-//  部署一覧取得（キャッシュ付き）
+//  部署一覧取得
 // ============================================================
 let _deptCache = null;
 async function getDepartments() {
@@ -404,6 +598,7 @@ async function populateEmployeeSelect(selectId, deptId, placeholder = '担当者
 async function getAvailableBadge() {
   const snap = await db.collection('badges')
     .where('status', '==', BADGE_STATUS.AVAILABLE)
+    .orderBy('badgeNumber')
     .limit(1).get();
   if (snap.empty) return null;
   return { id: snap.docs[0].id, ...snap.docs[0].data() };
@@ -424,7 +619,6 @@ function initNav() {
     userRoleEl.textContent = roleLabels[currentProfile.role] || '';
   }
 
-  // 権限に応じてナビ表示制御
   document.querySelectorAll('[data-roles]').forEach(el => {
     const allowed = el.getAttribute('data-roles').split(',').map(s => s.trim());
     if (currentProfile && !allowed.includes(currentProfile.role)) {
@@ -432,15 +626,15 @@ function initNav() {
     }
   });
 
-  // サインアウト
   document.querySelectorAll('.js-signout').forEach(btn => {
     btn.addEventListener('click', () => signOut());
   });
 
-  // アクティブリンク
   const current = location.pathname.split('/').pop() || 'index.html';
   document.querySelectorAll('.nav__link').forEach(link => {
-    if (link.getAttribute('href') === current) link.classList.add('nav__link--active');
+    const href = link.getAttribute('href') || '';
+    if (href === current || href === './' + current) link.classList.add('nav__link--active');
+    else link.classList.remove('nav__link--active');
   });
 }
 
@@ -463,11 +657,57 @@ function initNotificationBadge() {
 }
 
 // ============================================================
-//  モーダルの外クリックで閉じる
+//  モバイルナビ
 // ============================================================
-document.addEventListener('click', e => {
-  if (e.target.classList.contains('modal')) closeAllModals();
-});
+function initMobileNav() {
+  const hamburger = document.getElementById('hamburger');
+  const sidebar   = document.getElementById('sidebar');
+  const overlay   = document.getElementById('sidebar-overlay');
+  if (!hamburger) return;
+  hamburger.addEventListener('click', () => {
+    sidebar.classList.toggle('sidebar--open');
+    overlay.classList.toggle('sidebar-overlay--show');
+  });
+  overlay.addEventListener('click', () => {
+    sidebar.classList.remove('sidebar--open');
+    overlay.classList.remove('sidebar-overlay--show');
+  });
+}
+
+// ============================================================
+//  テーマ
+// ============================================================
+function initThemeToggle() {
+  const saved = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  const btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next    = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+  });
+}
+
+(function() {
+  if (localStorage.getItem('theme') === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+})();
+
+// ============================================================
+//  時計
+// ============================================================
+function startClock() {
+  const el = document.getElementById('topbar-clock');
+  if (!el) return;
+  const tick = () => el.textContent = new Date().toLocaleTimeString('ja-JP', {
+    hour:'2-digit', minute:'2-digit', second:'2-digit'
+  });
+  tick();
+  setInterval(tick, 1000);
+}
 
 // ============================================================
 //  初期化
