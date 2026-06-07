@@ -34,6 +34,8 @@
       <a class="nav__link" href="index.html"><i class="nav__icon">⊞</i>ダッシュボード</a>
       <a class="nav__link nav__link--active" href="reception.html"><i class="nav__icon">🎫</i>受付管理</a>
       <a class="nav__link" href="department.html" data-roles="admin,department"><i class="nav__icon">✅</i>部署承認</a>
+      <div class="nav__section" data-roles="admin">管理</div>
+      <a class="nav__link" href="admin.html" data-roles="admin"><i class="nav__icon">⚙</i>システム管理</a>
     </nav>
     <div class="sidebar__footer">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -276,11 +278,12 @@
   </div>
 </div>
 
+<!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-<script src=firebase-config.js"></script>
+<script src="firebase-config.js"></script>
 <script src="app.js"></script>
 <script src="reception.js"></script>
 </body>
