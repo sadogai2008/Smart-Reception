@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Smart Reception — ご来訪の受付</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="style.css">
 <style>
 /* ============================================================
    iPad 来訪者自己申請画面 専用スタイル
@@ -30,7 +30,6 @@ body { overflow: hidden; }
   pointer-events: none;
 }
 
-/* 受付不要粒子装飾 */
 .walkin-bg::after {
   content: '';
   position: absolute;
@@ -99,7 +98,6 @@ body { overflow: hidden; }
   z-index: 2;
 }
 
-/* ステップ画面 */
 .walkin-step { display: none; width: 100%; max-width: 720px; }
 .walkin-step--active { display: block; animation: stepIn .4s cubic-bezier(.34,1.56,.64,1); }
 
@@ -132,7 +130,6 @@ body { overflow: hidden; }
   margin-bottom: 36px;
 }
 
-/* フォームフィールド（iPad最適化） */
 .walkin-form .form-label {
   color: rgba(255,255,255,.5);
   font-size: 11px;
@@ -160,7 +157,6 @@ body { overflow: hidden; }
 
 .walkin-form .form-control::placeholder { color: rgba(255,255,255,.25); }
 
-/* ステップインジケーター */
 .step-indicator {
   display: flex;
   align-items: center;
@@ -185,7 +181,6 @@ body { overflow: hidden; }
   background: var(--color-success);
 }
 
-/* ボタン */
 .walkin-btn {
   width: 100%;
   padding: 18px 32px;
@@ -224,7 +219,6 @@ body { overflow: hidden; }
 
 .btn-row .walkin-btn { margin-top: 0; }
 
-/* 完了画面 */
 .success-icon {
   width: 80px; height: 80px;
   border-radius: 50%;
@@ -260,7 +254,6 @@ body { overflow: hidden; }
   text-transform: uppercase;
 }
 
-/* フォームグリッド */
 .form-grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -345,9 +338,9 @@ body { overflow: hidden; }
     <div class="walkin-step" id="step-2">
       <div class="walkin-card">
         <div class="step-indicator">
-          <div class="step-dot step-dot--done" id="dot-1b"></div>
-          <div class="step-dot step-dot--active" id="dot-2b"></div>
-          <div class="step-dot" id="dot-3b"></div>
+          <div class="step-dot step-dot--done"></div>
+          <div class="step-dot step-dot--active"></div>
+          <div class="step-dot"></div>
         </div>
         <div class="walkin-card__title">訪問先の確認</div>
         <div class="walkin-card__sub">ご訪問の詳細をご入力ください</div>
@@ -428,23 +421,29 @@ body { overflow: hidden; }
 <script>
 'use strict';
 
+// テーマ復元
+if (localStorage.getItem('theme') === 'dark') {
+  document.documentElement.setAttribute('data-theme', 'dark');
+}
+
 // ---- 時計 ----
-(function() {
-  if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+(function () {
   const clockEl = document.getElementById('walkin-clock');
   const dateEl  = document.getElementById('walkin-date');
   function tick() {
     const now = new Date();
-    if (clockEl) clockEl.textContent = now.toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' });
-    if (dateEl)  dateEl.textContent  = now.toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
+    if (clockEl) clockEl.textContent = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    if (dateEl)  dateEl.textContent  = now.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
   }
-  tick(); setInterval(tick, 1000);
+  tick();
+  setInterval(tick, 1000);
 })();
 
 // ---- ユーティリティ ----
 function sanitize(str) {
   if (!str) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 function showErrMsg(id, msg) {
   const el = document.getElementById(id);
@@ -465,15 +464,15 @@ function goStep(n) {
 async function loadDepartments() {
   const sel = document.getElementById('wi-department');
   try {
-    const snap = await db.collection('departments').where('isActive','==',true).orderBy('name').get();
+    const snap = await db.collection('departments').where('isActive', '==', true).orderBy('name').get();
     snap.docs.forEach(d => {
       const opt = document.createElement('option');
       opt.value = d.id;
       opt.dataset.name = d.data().name;
-      opt.textContent = d.data().name;
+      opt.textContent  = d.data().name;
       sel.appendChild(opt);
     });
-  } catch(e) { console.warn('Dept load error:', e); }
+  } catch (e) { console.warn('Dept load error:', e); }
 }
 
 async function loadHosts(deptId) {
@@ -482,8 +481,8 @@ async function loadHosts(deptId) {
   if (!deptId) return;
   try {
     const snap = await db.collection('employees')
-      .where('departmentId','==',deptId)
-      .where('isActive','==',true)
+      .where('departmentId', '==', deptId)
+      .where('isActive', '==', true)
       .orderBy('name').get();
     snap.docs.forEach(d => {
       const opt = document.createElement('option');
@@ -492,23 +491,22 @@ async function loadHosts(deptId) {
       opt.textContent  = d.data().name;
       sel.appendChild(opt);
     });
-  } catch(e) { console.warn('Host load error:', e); }
+  } catch (e) { console.warn('Host load error:', e); }
 }
 
-document.getElementById('wi-department').addEventListener('change', function() {
+document.getElementById('wi-department').addEventListener('change', function () {
   loadHosts(this.value);
 });
 
 // ---- STEP 1 バリデーション ----
 document.getElementById('btn-step1-next').addEventListener('click', () => {
-  let valid = true;
+  let valid   = true;
   const name    = document.getElementById('wi-name').value.trim();
   const company = document.getElementById('wi-company').value.trim();
   const phone   = document.getElementById('wi-phone').value.trim();
   const email   = document.getElementById('wi-email').value.trim();
 
-  clearErrMsg('err-wi-name'); clearErrMsg('err-wi-company');
-  clearErrMsg('err-wi-phone'); clearErrMsg('err-wi-email');
+  ['err-wi-name', 'err-wi-company', 'err-wi-phone', 'err-wi-email'].forEach(clearErrMsg);
 
   if (!name)    { showErrMsg('err-wi-name',    'お名前は必須です'); valid = false; }
   else if (name.length > 100) { showErrMsg('err-wi-name', '100文字以内で入力してください'); valid = false; }
@@ -517,11 +515,9 @@ document.getElementById('btn-step1-next').addEventListener('click', () => {
   if (phone && !/^[\d\-\+\(\)\s]{7,20}$/.test(phone)) { showErrMsg('err-wi-phone', '電話番号の形式が正しくありません'); valid = false; }
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showErrMsg('err-wi-email', 'メールアドレスの形式が正しくありません'); valid = false; }
 
-  // XSS チェック
   const xssPattern = /<script|javascript:|on\w+=/i;
   if ([name, company, phone, email].some(v => xssPattern.test(v))) {
-    alert('使用できない文字が含まれています');
-    return;
+    alert('使用できない文字が含まれています'); return;
   }
 
   if (valid) goStep(2);
@@ -530,22 +526,19 @@ document.getElementById('btn-step1-next').addEventListener('click', () => {
 // ---- STEP 2 バリデーション ----
 document.getElementById('btn-step2-back').addEventListener('click', () => goStep(1));
 document.getElementById('btn-step2-next').addEventListener('click', () => {
-  let valid = true;
+  let valid   = true;
   const deptSel = document.getElementById('wi-department');
   const hostSel = document.getElementById('wi-host');
   const purpose = document.getElementById('wi-purpose').value.trim();
 
-  clearErrMsg('err-wi-dept'); clearErrMsg('err-wi-host'); clearErrMsg('err-wi-purpose');
+  ['err-wi-dept', 'err-wi-host', 'err-wi-purpose'].forEach(clearErrMsg);
 
   if (!deptSel.value) { showErrMsg('err-wi-dept',    '訪問部署を選択してください'); valid = false; }
   if (!hostSel.value) { showErrMsg('err-wi-host',    '訪問相手を選択してください'); valid = false; }
   if (!purpose)       { showErrMsg('err-wi-purpose', 'ご用件は必須です'); valid = false; }
   else if (purpose.length > 500) { showErrMsg('err-wi-purpose', '500文字以内で入力してください'); valid = false; }
 
-  if (valid) {
-    renderConfirm();
-    goStep(3);
-  }
+  if (valid) { renderConfirm(); goStep(3); }
 });
 
 // ---- STEP 3 確認画面 ----
@@ -555,13 +548,13 @@ function renderConfirm() {
   const deptSel = document.getElementById('wi-department');
   const hostSel = document.getElementById('wi-host');
   const rows = [
-    ['お名前',     document.getElementById('wi-name').value.trim()],
-    ['会社名',     document.getElementById('wi-company').value.trim()],
-    ['電話番号',   document.getElementById('wi-phone').value.trim() || '—'],
-    ['メール',     document.getElementById('wi-email').value.trim() || '—'],
-    ['訪問部署',   deptSel.options[deptSel.selectedIndex]?.text || '—'],
-    ['訪問相手',   hostSel.options[hostSel.selectedIndex]?.text || '—'],
-    ['ご用件',     document.getElementById('wi-purpose').value.trim()],
+    ['お名前',   document.getElementById('wi-name').value.trim()],
+    ['会社名',   document.getElementById('wi-company').value.trim()],
+    ['電話番号', document.getElementById('wi-phone').value.trim() || '—'],
+    ['メール',   document.getElementById('wi-email').value.trim() || '—'],
+    ['訪問部署', deptSel.options[deptSel.selectedIndex]?.text || '—'],
+    ['訪問相手', hostSel.options[hostSel.selectedIndex]?.text || '—'],
+    ['ご用件',   document.getElementById('wi-purpose').value.trim()],
   ];
   const html = `<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden;">
     ${rows.map(([label, val], i) => `
@@ -577,7 +570,7 @@ function renderConfirm() {
 // ---- 申請送信 ----
 document.getElementById('btn-submit').addEventListener('click', async () => {
   const btn = document.getElementById('btn-submit');
-  btn.disabled = true;
+  btn.disabled    = true;
   btn.textContent = '送信中...';
 
   const deptSel = document.getElementById('wi-department');
@@ -600,7 +593,6 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
 
   try {
     await db.collection('walkIns').add(data);
-
     document.getElementById('receipt-number').textContent = data.receiptNumber;
     goStep(4);
 
@@ -609,9 +601,9 @@ document.getElementById('btn-submit').addEventListener('click', async () => {
       if (currentStep === 4) resetForm();
     }, 5 * 60 * 1000);
 
-  } catch(e) {
+  } catch (e) {
     alert('申請に失敗しました。スタッフにお声がけください。\n' + e.message);
-    btn.disabled = false;
+    btn.disabled    = false;
     btn.textContent = '申請する';
   }
 });
@@ -633,7 +625,7 @@ function resetForm() {
   document.getElementById('wi-host').innerHTML = '<option value="">担当者を選択</option>';
   document.getElementById('wi-purpose').value = '';
   document.querySelectorAll('.error-msg').forEach(el => el.textContent = '');
-  document.getElementById('btn-submit').disabled = false;
+  document.getElementById('btn-submit').disabled    = false;
   document.getElementById('btn-submit').textContent = '申請する';
   goStep(1);
 }
