@@ -346,9 +346,8 @@
 <script>
 'use strict';
 
-document.addEventListener('DOMContentLoaded', () => {
-  onReady();
-});
+// 管理者のみアクセス可
+initAuth([ROLES.ADMIN], onReady);
 
 let allLogs   = [];
 let allBadges = [];
@@ -619,25 +618,30 @@ function initModals() {
 
     showLoading('ユーザーを作成中...');
     try {
-      // Firebase Auth でユーザー作成（管理者APIがないためクライアント側でサインアップ後、Firestoreへ）
-      // 注意: 本番環境ではCloud Functionsを使用することを推奨
-      const tempAuth = firebase.auth();
-      const credential = await tempAuth.createUserWithEmailAndPassword(email, password);
+      // 管理者のメールと uid を先に保存
+      const adminUid   = currentUser.uid;
+      const adminEmail = currentUser.email;
+      const adminPassword = prompt('管理者パスワードを入力してください\n（新規ユーザー作成後にセッションを維持するために必要です）');
+      if (!adminPassword) { hideLoading(); return; }
+
+      // 新規ユーザーを Firebase Auth に作成（この時点で管理者セッションが切れる）
+      const credential = await auth.createUserWithEmailAndPassword(email, password);
       const uid = credential.user.uid;
 
+      // Firestore にユーザードキュメントを作成
       await db.collection('users').doc(uid).set({
         displayName: name, email, role,
         departmentId:   deptId || null,
         departmentName: deptName || null,
         isActive:  true,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        createdBy: currentUser.uid
+        createdBy: adminUid
       });
 
-      await writeLog('user_created', 'user', uid, 'user', { email, role });
+      // 管理者アカウントに戻る
+      await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
 
-      // 作成後、現在の管理者セッションに戻る（再サインイン）
-      // ※ 簡易実装: 本番環境ではAdmin SDKを推奨
+      await writeLog('user_created', 'user', uid, 'user', { email, role });
       showToast(`ユーザー「${name}」を作成しました`, 'success');
       closeModal('modal-add-user');
       loadUsers();
