@@ -187,7 +187,7 @@ async function loadDeptStats() {
     const deptId = currentProfile.departmentId;
     // 承認待ち
     let qPending = db.collection('walkIns').where('status', '==', 'pending');
-    if (deptId && !currentProfile.role === ROLES.ADMIN) qPending = qPending.where('departmentId', '==', deptId);
+    if (deptId && currentProfile.role !== ROLES.ADMIN) qPending = qPending.where('departmentId', '==', deptId);
     const pendingSnap = await qPending.get();
     document.getElementById('stat-pending-dept').textContent = pendingSnap.size;
 
@@ -206,9 +206,16 @@ function listenPendingWalkIns() {
   const badgeEl = document.getElementById('badge-pending-tab');
   const deptId  = currentProfile.departmentId;
 
-  let q = db.collection('walkIns').where('status', '==', 'pending').orderBy('submittedAt');
+  let q;
   if (deptId && currentProfile.role !== ROLES.ADMIN) {
-    q = q.where('departmentId', '==', deptId);
+    q = db.collection('walkIns')
+      .where('status', '==', 'pending')
+      .where('departmentId', '==', deptId)
+      .orderBy('submittedAt');
+  } else {
+    q = db.collection('walkIns')
+      .where('status', '==', 'pending')
+      .orderBy('submittedAt');
   }
 
   const unsub = q.onSnapshot(snap => {
@@ -334,12 +341,18 @@ async function rejectWalkIn(walkInId) {
 function listenDeptReservations() {
   const tbody  = document.getElementById('dept-res-list');
   const deptId = currentProfile.departmentId;
-  let q = db.collection('reservations')
-    .where('visitDate', '>=', todayStart())
-    .where('visitDate', '<=', todayEnd())
-    .orderBy('visitDate');
+  let q;
   if (deptId && currentProfile.role !== ROLES.ADMIN) {
-    q = q.where('departmentId', '==', deptId);
+    q = db.collection('reservations')
+      .where('departmentId', '==', deptId)
+      .where('visitDate', '>=', todayStart())
+      .where('visitDate', '<=', todayEnd())
+      .orderBy('visitDate');
+  } else {
+    q = db.collection('reservations')
+      .where('visitDate', '>=', todayStart())
+      .where('visitDate', '<=', todayEnd())
+      .orderBy('visitDate');
   }
   const unsub = q.onSnapshot(snap => {
     if (snap.empty) {
@@ -367,12 +380,18 @@ function listenDeptReservations() {
 function listenDeptHistory() {
   const tbody  = document.getElementById('dept-history-list');
   const deptId = currentProfile.departmentId;
-  let q = db.collection('walkIns')
-    .where('status', 'in', ['approved', 'rejected', 'checked_in'])
-    .where('submittedAt', '>=', todayStart())
-    .orderBy('submittedAt', 'desc');
+  let q;
   if (deptId && currentProfile.role !== ROLES.ADMIN) {
-    q = q.where('departmentId', '==', deptId);
+    q = db.collection('walkIns')
+      .where('departmentId', '==', deptId)
+      .where('status', 'in', ['approved', 'rejected', 'checked_in'])
+      .where('submittedAt', '>=', todayStart())
+      .orderBy('submittedAt', 'desc');
+  } else {
+    q = db.collection('walkIns')
+      .where('status', 'in', ['approved', 'rejected', 'checked_in'])
+      .where('submittedAt', '>=', todayStart())
+      .orderBy('submittedAt', 'desc');
   }
   const unsub = q.onSnapshot(snap => {
     historyData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
