@@ -1,4 +1,4 @@
-// js/firebase-config.js
+// firebase-config.js
 'use strict';
 
 const firebaseConfig = {
