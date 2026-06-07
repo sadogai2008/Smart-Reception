@@ -23,7 +23,7 @@
         <label class="form-label form-label--required" for="password">パスワード</label>
         <input class="form-control" type="password" id="password" placeholder="••••••••" autocomplete="current-password" required>
       </div>
-      <div id="login-error" style="display:none;color:#ff6b6b;font-size:13px;margin-bottom:16px;"></div>
+      <div id="login-error" style="display:none;color:#ff6b6b;font-size:13px;margin-bottom:16px;padding:10px;background:rgba(255,107,107,.1);border-radius:8px;"></div>
       <button class="btn btn--gold btn--lg" type="submit" id="login-btn" style="width:100%;margin-top:8px;">
         ログイン
       </button>
@@ -41,14 +41,26 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script>
-(function() {
-  // ダークモード復元
-  if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+(function () {
+  // テーマ復元
+  if (localStorage.getItem('theme') === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
 
   // ログイン済みならダッシュボードへ
   auth.onAuthStateChanged(user => {
     if (user) window.location.href = 'index.html';
   });
+
+  const errorMessages = {
+    'auth/user-not-found':      'メールアドレスが登録されていません。',
+    'auth/wrong-password':      'パスワードが正しくありません。',
+    'auth/invalid-email':       'メールアドレスの形式が正しくありません。',
+    'auth/user-disabled':       'このアカウントは無効化されています。',
+    'auth/too-many-requests':   'ログイン試行が多すぎます。しばらく待ってから再試行してください。',
+    'auth/invalid-credential':  'メールアドレスまたはパスワードが正しくありません。',
+    'auth/network-request-failed': 'ネットワークエラーが発生しました。接続を確認してください。'
+  };
 
   document.getElementById('login-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -67,15 +79,16 @@
     btn.textContent = 'ログイン中...';
     btn.disabled = true;
 
-try {
-  await auth.signInWithEmailAndPassword(email, password);
-} catch (err) {
-  alert(err.code);
-  console.log(err);
-
-  btn.textContent = 'ログイン';
-  btn.disabled = false;
-}
+    try {
+      await auth.signInWithEmailAndPassword(email, password);
+      // 成功 → onAuthStateChanged が index.html へリダイレクト
+    } catch (err) {
+      const msg = errorMessages[err.code] || `ログインに失敗しました。(${err.code})`;
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+      btn.textContent = 'ログイン';
+      btn.disabled = false;
+    }
   });
 })();
 </script>
