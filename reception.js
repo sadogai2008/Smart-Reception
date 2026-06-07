@@ -1,4 +1,4 @@
-// js/reception.js
+// reception.js
 'use strict';
 
 let selectedReservation = null;
@@ -7,7 +7,7 @@ let qrStream            = null;
 let qrScanActive        = false;
 
 // ============================================================
-//  初期化
+//  初期化（認証付き）
 // ============================================================
 initAuth([ROLES.ADMIN, ROLES.RECEPTIONIST], onReady);
 
@@ -27,28 +27,6 @@ function onReady(user, profile) {
   initEmergency();
 }
 
-function startClock() {
-  const el = document.getElementById('topbar-clock');
-  if (!el) return;
-  const tick = () => el.textContent = new Date().toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' });
-  tick(); setInterval(tick, 1000);
-}
-
-// ============================================================
-//  タブ
-// ============================================================
-function initTabs() {
-  document.querySelectorAll('.tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(b => b.classList.remove('tab--active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('tab-panel--active'));
-      btn.classList.add('tab--active');
-      const panel = document.getElementById('tab-' + btn.dataset.tab);
-      if (panel) panel.classList.add('tab-panel--active');
-    });
-  });
-}
-
 // ============================================================
 //  QRスキャナー
 // ============================================================
@@ -63,7 +41,7 @@ function initQRScanner() {
 
 async function startQR() {
   try {
-    const video  = document.getElementById('qr-video');
+    const video   = document.getElementById('qr-video');
     const scanner = document.getElementById('qr-scanner');
     qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
     video.srcObject = qrStream;
@@ -90,12 +68,11 @@ function scanLoop(video) {
   if (!qrScanActive) return;
   const canvas = document.createElement('canvas');
   const ctx    = canvas.getContext('2d');
-  canvas.width = video.videoWidth || 300;
+  canvas.width  = video.videoWidth  || 300;
   canvas.height = video.videoHeight || 300;
   ctx.drawImage(video, 0, 0);
   try {
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    // jsQR ライブラリが利用可能なら使用
     if (typeof jsQR !== 'undefined') {
       const code = jsQR(imageData.data, imageData.width, imageData.height);
       if (code) {
@@ -154,7 +131,6 @@ async function searchVisitor(query) {
   if (!query) return;
   showLoading('検索中...');
   try {
-    // 氏名前方一致検索
     const nameSnap = await db.collection('reservations')
       .where('visitDate', '>=', todayStart())
       .where('visitDate', '<=', todayEnd())
@@ -180,12 +156,12 @@ async function searchVisitor(query) {
 // ============================================================
 function showVisitorDetail(reservation) {
   selectedReservation = reservation;
-  document.getElementById('vi-name').textContent    = reservation.visitorName || '-';
+  document.getElementById('vi-name').textContent    = reservation.visitorName    || '-';
   document.getElementById('vi-company').textContent = reservation.visitorCompany || '-';
   document.getElementById('vi-dept').textContent    = reservation.departmentName || '-';
-  document.getElementById('vi-emp').textContent     = reservation.employeeName || '-';
+  document.getElementById('vi-emp').textContent     = reservation.employeeName   || '-';
   document.getElementById('vi-date').textContent    = formatDateTime(reservation.visitDate);
-  document.getElementById('vi-purpose').textContent = reservation.purpose || '-';
+  document.getElementById('vi-purpose').textContent = reservation.purpose        || '-';
 
   const detailEl = document.getElementById('checkin-detail');
   detailEl.classList.add('checkin-detail--show');
@@ -213,7 +189,6 @@ async function issueBadge(reservation) {
     document.getElementById('badge-number-display').textContent = badge.badgeNumber;
     document.getElementById('badge-visitor-name').textContent   = reservation.visitorName + ' 様';
     openModal('modal-badge');
-
     document.getElementById('btn-confirm-badge').onclick = () => confirmCheckin(reservation, badge);
   } catch (err) {
     showToast('入館証取得エラー: ' + err.message, 'error');
@@ -228,62 +203,54 @@ async function confirmCheckin(reservation, badge) {
     const batch = db.batch();
     const now   = firebase.firestore.FieldValue.serverTimestamp();
 
-    // checkins ドキュメント作成
-    const checkinRef = db.collection('checkins').doc();
+    const checkinRef  = db.collection('checkins').doc();
     const checkinData = {
-      reservationId:  reservation.id,
-      visitorName:    reservation.visitorName,
-      visitorCompany: reservation.visitorCompany,
-      visitorEmail:   reservation.visitorEmail || '',
-      departmentId:   reservation.departmentId,
-      departmentName: reservation.departmentName || '',
-      employeeId:     reservation.employeeId,
-      employeeName:   reservation.employeeName || '',
-      badgeId:        badge.badgeNumber,
-      badgeDocId:     badge.id,
-      checkinAt:      now,
-      checkoutAt:     null,
-      status:         'in',
+      reservationId:    reservation.id,
+      visitorName:      reservation.visitorName,
+      visitorCompany:   reservation.visitorCompany,
+      visitorEmail:     reservation.visitorEmail || '',
+      departmentId:     reservation.departmentId,
+      departmentName:   reservation.departmentName || '',
+      employeeId:       reservation.employeeId,
+      employeeName:     reservation.employeeName || '',
+      badgeId:          badge.badgeNumber,
+      badgeDocId:       badge.id,
+      checkinAt:        now,
+      checkoutAt:       null,
+      status:           'in',
       receptionistId:   currentUser.uid,
       receptionistName: currentProfile.displayName || '',
-      isWalkIn:       false,
-      createdAt:      now
+      isWalkIn:         false,
+      createdAt:        now
     };
     batch.set(checkinRef, checkinData);
 
-    // 予約ステータス更新
     batch.update(db.collection('reservations').doc(reservation.id), {
       status:    RESERVATION_STATUS.CHECKED_IN,
       checkinId: checkinRef.id,
       updatedAt: now
     });
 
-    // 入館証ステータス更新
     batch.update(db.collection('badges').doc(badge.id), {
-      status:            BADGE_STATUS.IN_USE,
-      currentCheckinId:  checkinRef.id,
-      currentVisitorName:reservation.visitorName,
-      issuedAt:          now,
-      updatedAt:         now
+      status:             BADGE_STATUS.IN_USE,
+      currentCheckinId:   checkinRef.id,
+      currentVisitorName: reservation.visitorName,
+      issuedAt:           now,
+      updatedAt:          now
     });
 
     await batch.commit();
 
-    // ログ・通知
     await writeLog('checkin', 'checkin', checkinRef.id, 'checkin', {
       visitorName: reservation.visitorName, badge: badge.badgeNumber
     });
     await createNotification('checkin', '入館通知', `${reservation.visitorName}様が入館されました（${badge.badgeNumber}）`, checkinRef.id);
 
-    // 担当者へメール
     if (reservation.employeeId) {
       try {
         const empSnap = await db.collection('employees').doc(reservation.employeeId).get();
         if (empSnap.exists) {
-          await sendCheckinEmail(
-            { ...checkinData, checkinAt: new Date() },
-            empSnap.data().email
-          );
+          await sendCheckinEmail({ ...checkinData, checkinAt: new Date() }, empSnap.data().email);
         }
       } catch (e) { console.warn('Mail error:', e); }
     }
@@ -302,7 +269,7 @@ async function confirmCheckin(reservation, badge) {
 }
 
 // ============================================================
-//  本日予約リスト
+//  本日予約リスト（リアルタイム）
 // ============================================================
 function listenTodayReservations() {
   const tbody = document.getElementById('today-list');
@@ -316,12 +283,12 @@ function listenTodayReservations() {
       tbody.innerHTML = '<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--color-text-3);">本日の予約はありません</td></tr>';
       return;
     }
+    const statusLabels = {
+      pending: '予約済', confirmed: '確認済', checked_in: '入館中',
+      checked_out: '退館済', cancelled: 'キャンセル', rejected: '拒否'
+    };
     tbody.innerHTML = snap.docs.map(d => {
       const r = d.data();
-      const statusLabels = {
-        pending:'予約済', confirmed:'確認済', checked_in:'入館中',
-        checked_out:'退館済', cancelled:'キャンセル', rejected:'拒否'
-      };
       const canCheckin = r.status === RESERVATION_STATUS.PENDING || r.status === RESERVATION_STATUS.CONFIRMED;
       return `<tr class="fade-in">
         <td><strong>${sanitize(r.visitorName)}</strong></td>
@@ -331,7 +298,7 @@ function listenTodayReservations() {
         <td><span class="badge badge--${r.status}">${statusLabels[r.status] || r.status}</span></td>
         <td>
           ${canCheckin
-            ? `<button class="btn btn--gold btn--sm" onclick="showVisitorDetail(${JSON.stringify({id:d.id,...r}).replace(/"/g,'&quot;')})">受付</button>`
+            ? `<button class="btn btn--gold btn--sm" onclick="showVisitorDetail(${JSON.stringify({ id: d.id, ...r }).replace(/"/g, '&quot;')})">受付</button>`
             : '—'
           }
         </td>
@@ -342,11 +309,11 @@ function listenTodayReservations() {
 }
 
 // ============================================================
-//  当日受付一覧（リアルタイム）
+//  当日受付（walkIns リアルタイム）
 // ============================================================
 function listenWalkIns() {
-  const listEl    = document.getElementById('walkin-list');
-  const countEl   = document.getElementById('walkin-count');
+  const listEl  = document.getElementById('walkin-list');
+  const countEl = document.getElementById('walkin-count');
   const q = db.collection('walkIns')
     .where('status', '==', WALKIN_STATUS.PENDING)
     .orderBy('submittedAt');
@@ -354,7 +321,10 @@ function listenWalkIns() {
   const unsub = q.onSnapshot(snap => {
     if (countEl) countEl.textContent = snap.size + '件';
     if (snap.empty) {
-      listEl.innerHTML = `<div class="empty-state"><div class="empty-state__icon">📋</div><p class="empty-state__title">承認待ちはありません</p></div>`;
+      listEl.innerHTML = `<div class="empty-state">
+        <div class="empty-state__icon">📋</div>
+        <p class="empty-state__title">承認待ちはありません</p>
+      </div>`;
       return;
     }
     listEl.innerHTML = snap.docs.map(d => {
@@ -398,22 +368,22 @@ async function approveWalkIn(walkInId) {
     const checkinRef = db.collection('checkins').doc();
 
     batch.set(checkinRef, {
-      walkInId:       walkInId,
-      visitorName:    w.name,
-      visitorCompany: w.company,
-      visitorEmail:   w.email || '',
-      departmentId:   w.departmentId || '',
-      departmentName: w.departmentName || '',
-      employeeName:   w.hostName || '',
-      badgeId:        badge.badgeNumber,
-      badgeDocId:     badge.id,
-      checkinAt:      now,
-      checkoutAt:     null,
-      status:         'in',
+      walkInId:         walkInId,
+      visitorName:      w.name,
+      visitorCompany:   w.company,
+      visitorEmail:     w.email || '',
+      departmentId:     w.departmentId || '',
+      departmentName:   w.departmentName || '',
+      employeeName:     w.hostName || '',
+      badgeId:          badge.badgeNumber,
+      badgeDocId:       badge.id,
+      checkinAt:        now,
+      checkoutAt:       null,
+      status:           'in',
       receptionistId:   currentUser.uid,
       receptionistName: currentProfile.displayName || '',
-      isWalkIn:       true,
-      createdAt:      now
+      isWalkIn:         true,
+      createdAt:        now
     });
 
     batch.update(db.collection('walkIns').doc(walkInId), {
@@ -424,11 +394,11 @@ async function approveWalkIn(walkInId) {
     });
 
     batch.update(db.collection('badges').doc(badge.id), {
-      status:            BADGE_STATUS.IN_USE,
-      currentCheckinId:  checkinRef.id,
-      currentVisitorName:w.name,
-      issuedAt:          now,
-      updatedAt:         now
+      status:             BADGE_STATUS.IN_USE,
+      currentCheckinId:   checkinRef.id,
+      currentVisitorName: w.name,
+      issuedAt:           now,
+      updatedAt:          now
     });
 
     await batch.commit();
@@ -500,7 +470,6 @@ function initCheckout() {
 async function checkoutByBadge(badgeNumber) {
   showLoading('退館処理中...');
   try {
-    // checkins から入館証番号で検索
     const snap = await db.collection('checkins')
       .where('badgeId', '==', badgeNumber)
       .where('status', '==', 'in')
@@ -527,26 +496,24 @@ async function processCheckout(checkinId, visitorName) {
     const checkinSnap = await db.collection('checkins').doc(checkinId).get();
     if (!checkinSnap.exists) { showToast('チェックイン記録が見つかりません。', 'error'); return; }
     const checkin = checkinSnap.data();
-    const now = firebase.firestore.FieldValue.serverTimestamp();
-    const batch = db.batch();
+    const now     = firebase.firestore.FieldValue.serverTimestamp();
+    const batch   = db.batch();
 
     batch.update(db.collection('checkins').doc(checkinId), {
       status:     'out',
       checkoutAt: now
     });
 
-    // 入館証を返却済みに
     if (checkin.badgeDocId) {
       batch.update(db.collection('badges').doc(checkin.badgeDocId), {
-        status:            BADGE_STATUS.AVAILABLE,
-        currentCheckinId:  null,
-        currentVisitorName:null,
-        returnedAt:        now,
-        updatedAt:         now
+        status:             BADGE_STATUS.AVAILABLE,
+        currentCheckinId:   null,
+        currentVisitorName: null,
+        returnedAt:         now,
+        updatedAt:          now
       });
     }
 
-    // 予約がある場合ステータス更新
     if (checkin.reservationId) {
       batch.update(db.collection('reservations').doc(checkin.reservationId), {
         status:    RESERVATION_STATUS.CHECKED_OUT,
@@ -558,15 +525,11 @@ async function processCheckout(checkinId, visitorName) {
     await writeLog('checkout', 'checkin', checkinId, 'checkin', { visitorName: checkin.visitorName });
     await createNotification('checkout', '退館通知', `${checkin.visitorName}様が退館されました`, checkinId);
 
-    // 担当者へメール
     if (checkin.employeeId) {
       try {
         const empSnap = await db.collection('employees').doc(checkin.employeeId).get();
         if (empSnap.exists) {
-          await sendCheckoutEmail(
-            { ...checkin, checkoutAt: new Date() },
-            empSnap.data().email
-          );
+          await sendCheckoutEmail({ ...checkin, checkoutAt: new Date() }, empSnap.data().email);
         }
       } catch (e) { console.warn('Mail error:', e); }
     }
@@ -601,7 +564,7 @@ function listenCheckoutHistory() {
         const inMs  = c.checkinAt.toDate  ? c.checkinAt.toDate().getTime()  : new Date(c.checkinAt).getTime();
         const outMs = c.checkoutAt.toDate ? c.checkoutAt.toDate().getTime() : new Date(c.checkoutAt).getTime();
         const min   = Math.round((outMs - inMs) / 60000);
-        stay = `${Math.floor(min/60)}時間${min % 60}分`;
+        stay = `${Math.floor(min / 60)}時間${min % 60}分`;
       }
       return `<tr class="fade-in">
         <td>${sanitize(c.visitorName)}</td>
@@ -655,35 +618,12 @@ async function loadEmergencyList() {
 
 function exportEmergencyCSV() {
   const rows = emergencyData.map(c => ({
-    '氏名':       c.visitorName,
-    '会社':       c.visitorCompany,
-    '入館証':     c.badgeId || '-',
-    '入館時刻':   formatDateTime(c.checkinAt),
-    '部署':       c.departmentName || '-',
-    '担当者':     c.employeeName || '-'
+    '氏名':     c.visitorName,
+    '会社':     c.visitorCompany,
+    '入館証':   c.badgeId || '-',
+    '入館時刻': formatDateTime(c.checkinAt),
+    '部署':     c.departmentName || '-',
+    '担当者':   c.employeeName || '-'
   }));
-  exportCSV(rows, `緊急在館者一覧_${new Date().toLocaleDateString('ja-JP').replace(/\//g,'-')}.csv`);
-}
-
-// ============================================================
-//  モバイルナビ・テーマ
-// ============================================================
-function initMobileNav() {
-  const h = document.getElementById('hamburger');
-  const s = document.getElementById('sidebar');
-  const o = document.getElementById('sidebar-overlay');
-  if (!h) return;
-  h.addEventListener('click', () => { s.classList.toggle('sidebar--open'); o.classList.toggle('sidebar-overlay--show'); });
-  o.addEventListener('click', () => { s.classList.remove('sidebar--open'); o.classList.remove('sidebar-overlay--show'); });
-}
-
-function initThemeToggle() {
-  if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
-  const btn = document.getElementById('theme-toggle');
-  if (!btn) return;
-  btn.addEventListener('click', () => {
-    const n = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', n);
-    localStorage.setItem('theme', n);
-  });
+  exportCSV(rows, `緊急在館者一覧_${new Date().toLocaleDateString('ja-JP').replace(/\//g, '-')}.csv`);
 }
