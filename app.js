@@ -1,4 +1,4 @@
-// js/app.js — 共通ロジック・認証・ユーティリティ（完全版）
+// app.js — 共通ロジック・認証・ユーティリティ
 'use strict';
 
 // ============================================================
@@ -12,12 +12,12 @@ const ROLES = {
 };
 
 const RESERVATION_STATUS = {
-  PENDING:    'pending',
-  CONFIRMED:  'confirmed',
-  CHECKED_IN: 'checked_in',
-  CHECKED_OUT:'checked_out',
-  CANCELLED:  'cancelled',
-  REJECTED:   'rejected'
+  PENDING:     'pending',
+  CONFIRMED:   'confirmed',
+  CHECKED_IN:  'checked_in',
+  CHECKED_OUT: 'checked_out',
+  CANCELLED:   'cancelled',
+  REJECTED:    'rejected'
 };
 
 const BADGE_STATUS = {
@@ -40,6 +40,15 @@ const WALKIN_STATUS = {
 let currentUser    = null;
 let currentProfile = null;
 let unsubscribers  = [];
+
+// ============================================================
+//  テーマ即時反映（DOMContentLoaded前に実行）
+// ============================================================
+(function () {
+  if (localStorage.getItem('theme') === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+})();
 
 // ============================================================
 //  認証
@@ -170,22 +179,22 @@ function validateForm(fields) {
 function formatDate(ts) {
   if (!ts) return '-';
   const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' });
+  return d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
 function formatDateTime(ts) {
   if (!ts) return '-';
   const d = ts.toDate ? ts.toDate() : new Date(ts);
   return d.toLocaleString('ja-JP', {
-    year:'numeric', month:'2-digit', day:'2-digit',
-    hour:'2-digit', minute:'2-digit'
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit'
   });
 }
 
 function formatTime(ts) {
   if (!ts) return '-';
   const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' });
+  return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 }
 
 function todayStart() {
@@ -236,7 +245,7 @@ async function writeLog(action, category, targetId, targetType, detail = {}) {
       userId:    currentUser ? currentUser.uid : 'anonymous',
       userName:  currentProfile ? currentProfile.displayName : 'anonymous',
       userAgent: navigator.userAgent,
-      ipHint:    '',  // サーバーサイドで設定
+      ipHint:    '',
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
   } catch (e) { console.warn('Log write failed:', e); }
@@ -277,76 +286,70 @@ async function sendEmail(templateId, params) {
   return emailjs.send(EMAILJS_CONFIG.serviceId, templateId, params);
 }
 
-// ① 来訪予約登録完了メール
 async function sendInviteEmail(reservation) {
   const settings = await getSettings();
-  const qrUrl = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}qr.html?token=${reservation.qrToken}&id=${reservation.id}`;
+  const qrUrl = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}walkin.html?token=${reservation.qrToken}&id=${reservation.id}`;
   return sendEmail(EMAILJS_CONFIG.templateInvite, {
-    to_email:    reservation.visitorEmail,
-    to_name:     reservation.visitorName,
-    visit_date:  formatDateTime(reservation.visitDate),
-    department:  reservation.departmentName || '',
-    employee:    reservation.employeeName || '',
-    purpose:     reservation.purpose || '',
-    qr_url:      qrUrl,
-    facility:    settings.facilityName || 'Smart Reception',
-    address:     settings.address || '',
-    floor:       settings.floor || ''
+    to_email:   reservation.visitorEmail,
+    to_name:    reservation.visitorName,
+    visit_date: formatDateTime(reservation.visitDate),
+    department: reservation.departmentName || '',
+    employee:   reservation.employeeName || '',
+    purpose:    reservation.purpose || '',
+    qr_url:     qrUrl,
+    facility:   settings.facilityName || 'Smart Reception',
+    address:    settings.address || '',
+    floor:      settings.floor || ''
   });
 }
 
-// ② 前日リマインドメール
 async function sendReminderEmail(reservation) {
   const settings = await getSettings();
-  const qrUrl = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}qr.html?token=${reservation.qrToken}&id=${reservation.id}`;
+  const qrUrl = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}walkin.html?token=${reservation.qrToken}&id=${reservation.id}`;
   return sendEmail(EMAILJS_CONFIG.templateReminder, {
-    to_email:    reservation.visitorEmail,
-    to_name:     reservation.visitorName,
-    visit_date:  formatDateTime(reservation.visitDate),
-    department:  reservation.departmentName || '',
-    employee:    reservation.employeeName || '',
-    qr_url:      qrUrl,
-    facility:    settings.facilityName || 'Smart Reception'
+    to_email:   reservation.visitorEmail,
+    to_name:    reservation.visitorName,
+    visit_date: formatDateTime(reservation.visitDate),
+    department: reservation.departmentName || '',
+    employee:   reservation.employeeName || '',
+    qr_url:     qrUrl,
+    facility:   settings.facilityName || 'Smart Reception'
   });
 }
 
-// ③ 受付完了通知 + ④ 入館通知
 async function sendCheckinEmail(checkin, employeeEmail) {
   return sendEmail(EMAILJS_CONFIG.templateCheckin, {
-    to_email:         employeeEmail,
-    visitor_name:     checkin.visitorName,
-    visitor_company:  checkin.visitorCompany,
-    checkin_time:     formatDateTime(checkin.checkinAt),
-    badge_number:     checkin.badgeId,
-    receptionist:     checkin.receptionistName || '',
-    department:       checkin.departmentName || ''
+    to_email:        employeeEmail,
+    visitor_name:    checkin.visitorName,
+    visitor_company: checkin.visitorCompany,
+    checkin_time:    formatDateTime(checkin.checkinAt),
+    badge_number:    checkin.badgeId,
+    receptionist:    checkin.receptionistName || '',
+    department:      checkin.departmentName || ''
   });
 }
 
-// ⑤ 退館通知
 async function sendCheckoutEmail(checkin, employeeEmail) {
   return sendEmail(EMAILJS_CONFIG.templateCheckout, {
-    to_email:         employeeEmail,
-    visitor_name:     checkin.visitorName,
-    visitor_company:  checkin.visitorCompany,
-    checkout_time:    formatDateTime(checkin.checkoutAt),
-    stay_duration:    calcStayDuration(checkin.checkinAt, checkin.checkoutAt)
+    to_email:        employeeEmail,
+    visitor_name:    checkin.visitorName,
+    visitor_company: checkin.visitorCompany,
+    checkout_time:   formatDateTime(checkin.checkoutAt),
+    stay_duration:   calcStayDuration(checkin.checkinAt, checkin.checkoutAt)
   });
 }
 
-// ⑥ 未退館アラート
 async function sendOverstayAlert(checkin, employeeEmail) {
   return sendEmail(EMAILJS_CONFIG.templateAlert, {
-    to_email:         employeeEmail,
-    visitor_name:     checkin.visitorName,
-    visitor_company:  checkin.visitorCompany,
-    checkin_time:     formatDateTime(checkin.checkinAt),
-    badge_number:     checkin.badgeId,
-    hours_elapsed:    calcStayDuration(checkin.checkinAt, { toDate: () => new Date() })
+    to_email:        employeeEmail,
+    visitor_name:    checkin.visitorName,
+    visitor_company: checkin.visitorCompany,
+    checkin_time:    formatDateTime(checkin.checkinAt),
+    badge_number:    checkin.badgeId,
+    hours_elapsed:   calcStayDuration(checkin.checkinAt, { toDate: () => new Date() })
   });
 }
 
-// 承認通知メール
 async function sendApprovalEmail(walkIn, approved, reason = '') {
   return sendEmail(EMAILJS_CONFIG.templateApproval, {
     to_email:   walkIn.email || '',
@@ -358,8 +361,7 @@ async function sendApprovalEmail(walkIn, approved, reason = '') {
 }
 
 // ============================================================
-//  前日リマインドスケジューラ（クライアントサイド）
-//  管理者・受付ログイン時に起動
+//  前日リマインドスケジューラ
 // ============================================================
 async function runReminderScheduler() {
   try {
@@ -371,8 +373,7 @@ async function runReminderScheduler() {
 
     for (const doc of snap.docs) {
       const r = doc.data();
-      const alreadySent = r.reminderSentAt;
-      if (alreadySent) continue;
+      if (r.reminderSentAt) continue;
       try {
         await sendReminderEmail({ ...r, id: doc.id });
         await doc.ref.update({ reminderSentAt: firebase.firestore.FieldValue.serverTimestamp() });
@@ -387,24 +388,19 @@ async function runReminderScheduler() {
 }
 
 // ============================================================
-//  未退館アラートスケジューラ（クライアントサイド）
-//  3時間以上在館で担当者へアラート
+//  未退館アラートスケジューラ（3時間以上在館）
 // ============================================================
 async function runOverstayChecker() {
   try {
-    const thresholdMs = 3 * 60 * 60 * 1000; // 3時間
-    const snap = await db.collection('checkins')
-      .where('status', '==', 'in')
-      .get();
+    const thresholdMs = 3 * 60 * 60 * 1000;
+    const snap = await db.collection('checkins').where('status', '==', 'in').get();
 
     for (const doc of snap.docs) {
       const c = doc.data();
       if (!c.checkinAt) continue;
       const checkinMs = c.checkinAt.toDate ? c.checkinAt.toDate().getTime() : new Date(c.checkinAt).getTime();
-      const elapsed   = Date.now() - checkinMs;
-      if (elapsed < thresholdMs) continue;
+      if (Date.now() - checkinMs < thresholdMs) continue;
 
-      // 1時間ごとに1回のみ送信
       const lastAlertMs = c.lastAlertSentAt
         ? (c.lastAlertSentAt.toDate ? c.lastAlertSentAt.toDate().getTime() : new Date(c.lastAlertSentAt).getTime())
         : 0;
@@ -472,7 +468,7 @@ function showToast(message, type = 'info', duration = 4000) {
   }
   const toast = document.createElement('div');
   toast.className = `toast toast--${type}`;
-  const icons = { success:'✓', error:'✕', warning:'⚠', info:'ℹ' };
+  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
   toast.innerHTML = `<span class="toast__icon">${icons[type] || 'ℹ'}</span><span class="toast__msg">${sanitize(message)}</span>`;
   container.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add('toast--show'));
@@ -613,8 +609,10 @@ function initNav() {
   if (userNameEl && currentProfile) userNameEl.textContent = currentProfile.displayName || '';
   if (userRoleEl && currentProfile) {
     const roleLabels = {
-      admin:'システム管理者', employee:'社員',
-      receptionist:'受付担当者', department:'部署担当者'
+      admin:        'システム管理者',
+      employee:     '社員',
+      receptionist: '受付担当者',
+      department:   '部署担当者'
     };
     userRoleEl.textContent = roleLabels[currentProfile.role] || '';
   }
@@ -675,7 +673,7 @@ function initMobileNav() {
 }
 
 // ============================================================
-//  テーマ
+//  テーマ切替
 // ============================================================
 function initThemeToggle() {
   const saved = localStorage.getItem('theme') || 'light';
@@ -690,12 +688,6 @@ function initThemeToggle() {
   });
 }
 
-(function() {
-  if (localStorage.getItem('theme') === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  }
-})();
-
 // ============================================================
 //  時計
 // ============================================================
@@ -703,14 +695,29 @@ function startClock() {
   const el = document.getElementById('topbar-clock');
   if (!el) return;
   const tick = () => el.textContent = new Date().toLocaleTimeString('ja-JP', {
-    hour:'2-digit', minute:'2-digit', second:'2-digit'
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
   });
   tick();
   setInterval(tick, 1000);
 }
 
 // ============================================================
-//  初期化
+//  タブ共通初期化
+// ============================================================
+function initTabs() {
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(b => b.classList.remove('tab--active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('tab-panel--active'));
+      btn.classList.add('tab--active');
+      const panel = document.getElementById('tab-' + btn.dataset.tab);
+      if (panel) panel.classList.add('tab-panel--active');
+    });
+  });
+}
+
+// ============================================================
+//  DOMContentLoaded
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   initEmailJS();
